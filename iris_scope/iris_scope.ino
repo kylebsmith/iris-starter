@@ -1,0 +1,332 @@
+/* iris_scope — SEE THE MAPPING
+   ===========================
+   This is the first thing to run. Not because it makes sound, but because it
+   makes the network VISIBLE.
+
+   You tilt the board and press a key three times. Each press says "when the
+   board is like THIS, the numbers should be THAT." Then the network fills in
+   everything in between — and the whole point of this sketch is that you can
+   SEE what it filled in, as a curve, instead of taking it on faith.
+
+   Run the Processing sketch in processing/iris_scope/ and you get:
+
+     TRANSFER VIEW   your demonstrations as dots, and the curve the network
+                     drew through them. The dots are yours. The curve is the
+                     network's. Everything between the dots is invented, and
+                     that invention IS the instrument.
+
+     SCOPE VIEW      the two outputs plotted against each other, the way an
+                     oscilloscope in X-Y mode plots two voltages. One input
+                     sweeping through its range traces a shape. That shape is
+                     the mapping, drawn as geometry.
+
+   You can also just read the serial output. It is plain text on purpose.
+
+   WHAT IT SENDS (one thing per line, so you can read it yourself)
+     R lo hi              the input range it has seen so far
+     D index x y0 y1      demonstration: input x taught to mean (y0, y1)
+     C n x0 a0 b0 x1 ...  the curve: n points of (input, out0, out1)
+     L x y0 y1            live: where you are right now
+     M text               a message for the human
+
+   HARDWARE: a board and a BNO055 on I2C. Nothing else -- no knobs, no
+   buttons, no screen. If you have no sensor at all, set USE_ANALOG to 1 and
+   it reads a potentiometer on A0 instead. Everything below that is identical.
+
+   WHAT IT LISTENS FOR
+     SPACE     teach it: this pose means the point you last clicked
+     T y0 y1   set that point (Processing sends this when you click)
+     d         delete the last demonstration and retrain
+     c         clear everything
+   ========================================================================= */
+
+#define USE_ANALOG 0        /* 1 = potentiometer on A0, no sensor needed */
+
+#include <Wire.h>
+#if !USE_ANALOG
+#include <Adafruit_BNO055.h>
+#endif
+#include "iris.h"
+
+#ifdef ARDUINO_ARCH_ESP32
+#if !ARDUINO_USB_CDC_ON_BOOT
+#error "Set Tools -> USB CDC On Boot -> 'Enabled', or the plot will never receive anything."
+#endif
+#endif
+
+/* ---- the shape of the instrument ---------------------------------------
+   ONE input and TWO outputs, deliberately. One input is the smallest thing
+   that still has an inside — you can draw its whole behaviour as a curve on
+   a screen, which you cannot do once there are three or four. Two outputs is
+   the smallest number that makes the scope view interesting: one output is a
+   line, two is a shape. Change these when the picture stops surprising you. */
+#define N_IN    1
+#define N_OUT   2
+#define N_HID  12
+#define N_DEMOS 12
+#define CURVE_POINTS 96      /* how finely we sample the curve for drawing */
+
+#if defined(__AVR__)         /* small board: shrink the working arrays. See iris.h. */
+#define IRIS_MAX_IN  4
+#define IRIS_MAX_OUT 4
+#define IRIS_MAX_HID 12
+#endif
+
+static unsigned char memory[IRIS_ARENA(N_IN, N_HID, N_OUT, N_DEMOS)];
+static iris *k;
+
+#if !USE_ANALOG
+static Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
+#endif
+
+/* Every demonstration we have taken, kept so the plot can draw the dots.
+   The library also holds them -- iris_get(k, i, ...) would return them -- but
+   keeping our own copy means the drawing code stays obvious. */
+static float demo_x[N_DEMOS], demo_y0[N_DEMOS], demo_y1[N_DEMOS];
+static int   demos = 0;
+
+static float seen_lo =  1e30f, seen_hi = -1e30f;
+
+/* ---- FILL THIS IN 1: WHERE THE INPUT COMES FROM -------------------------
+   One number. That is all this sketch wants. Tilt, a knob, light, distance,
+   how hard you are squeezing something -- anything that moves. */
+static float read_input(void) {
+#if USE_ANALOG
+  return (float)analogRead(A0);
+#else
+  imu::Vector<3> g = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
+  return (float)g.x();                 /* one axis of tilt, roughly -9.8..+9.8 */
+#endif
+}
+
+/* ---- WHAT YOU ARE TEACHING IT TO SAY ------------------------------------
+   The target comes from the Processing window: you click where you want this
+   pose to land, and it sends "T y0 y1". No knobs, no extra wiring.
+
+   An earlier version read two potentiometers on A1 and A2. With nothing wired
+   those pins float, so every demonstration taught a random pair of numbers and
+   the picture was noise -- a demo whose first impression depends on hardware
+   the student was not told to buy is not a first demo. */
+static float target0 = 0.5f, target1 = 0.5f;
+
+/* Read one line like "T 0.31 0.88" that has already had its 'T' consumed. */
+static void read_target_from_serial(void) {
+  target0 = Serial.parseFloat();
+  target1 = Serial.parseFloat();
+  if (target0 < 0.0f) target0 = 0.0f;  if (target0 > 1.0f) target0 = 1.0f;
+  if (target1 < 0.0f) target1 = 0.0f;  if (target1 > 1.0f) target1 = 1.0f;
+}
+
+static void say(const char *m) { Serial.print(F("M ")); Serial.println(m); }
+
+static void send_range(void) {
+  float lo = seen_lo, hi = seen_hi;
+  if (!(hi > lo) || (hi - lo) < 0.05f) {       /* same widening as send_curve,
+                                                  so the axes match the curve */
+    float mid = (hi > lo) ? (lo + hi) * 0.5f : lo;
+    lo = mid - 0.5f; hi = mid + 0.5f;
+  }
+  Serial.print(F("R ")); Serial.print(lo, 4);
+  Serial.print(' ');     Serial.println(hi, 4);
+}
+
+static void send_demos(void) {
+  for (int i = 0; i < demos; ++i) {
+    Serial.print(F("D ")); Serial.print(i);
+    Serial.print(' ');     Serial.print(demo_x[i], 4);
+    Serial.print(' ');     Serial.print(demo_y0[i], 4);
+    Serial.print(' ');     Serial.println(demo_y1[i], 4);
+  }
+}
+
+/* THE INTERESTING ONE. We sweep a pretend input across the whole range the
+   sensor has visited and ask the network what it would say at every step --
+   including at values you never demonstrated. That sweep IS the mapping. It
+   costs CURVE_POINTS predictions, about 1.4 ms on an ESP32-S3. */
+static void send_curve(void) {
+  if (demos < 2) return;
+
+  /* If the sensor has barely moved there is no range to sweep, and an earlier
+     version simply sent nothing -- leaving a blank window and no reason for
+     it. Widen a degenerate range so there is always something to draw, and say
+     plainly that the poses were too close together, which is the real problem
+     and the same one iris_tilt warns about. */
+  float lo = seen_lo, hi = seen_hi;
+  if (!(hi > lo) || (hi - lo) < 0.05f) {
+    float mid = (hi > lo) ? (lo + hi) * 0.5f : lo;
+    lo = mid - 0.5f; hi = mid + 0.5f;
+    say("your poses are nearly identical - move the sensor further between them");
+  }
+
+  Serial.print(F("C ")); Serial.print(CURVE_POINTS);
+  for (int i = 0; i < CURVE_POINTS; ++i) {
+    float x = lo + (hi - lo) * ((float)i / (float)(CURVE_POINTS - 1));
+    float out[N_OUT];
+    iris_predict(k, &x, out);
+    Serial.print(' '); Serial.print(x, 4);
+    Serial.print(' '); Serial.print(out[0], 4);
+    Serial.print(' '); Serial.print(out[1], 4);
+  }
+  Serial.println();
+}
+
+/* Are the demonstrations actually far apart? This asks about the POSES, not
+   about how far the sensor has wandered while sitting still. Those are
+   different numbers and confusing them makes the warning useless: a board
+   drifting 0.34 through noise looks like a healthy range while every pose was
+   taken at the same spot. Teaching two different answers at one input is not
+   a mistake the network can resolve -- it averages them, correctly, and the
+   curve comes out flat. Better to say so than to let someone conclude the
+   library does not work. */
+static void check_spread(void) {
+  if (demos < 2) return;
+  float lo = demo_x[0], hi = demo_x[0];
+  for (int i = 1; i < demos; ++i) {
+    if (demo_x[i] < lo) lo = demo_x[i];
+    if (demo_x[i] > hi) hi = demo_x[i];
+  }
+  if (hi - lo < 0.5f) {
+    say("your poses are almost in the same place, so the curve will be flat");
+    say("- move the sensor a LOT between demonstrations, then press 'c' and retry");
+  }
+}
+
+/* TRAINING IN SLICES, so the plot keeps updating while it learns.
+   iris_train() would block for up to three seconds on this board and the live
+   dot would freeze -- in a sketch whose whole purpose is watching the mapping
+   form, that is the worst possible moment to stop drawing. iris_train_begin +
+   iris_train_slice do the identical fit in pieces: verified bit-identical at
+   4, 12 and 20 demonstrations, including with a prediction between every
+   slice, which is exactly what happens below.
+
+   The reseed is what keeps it identical -- iris_train() does it first and
+   iris_train_begin does not do it for you. */
+static bool training = false;
+
+static void retrain_and_redraw(void) {
+  if (demos < 2) return;
+  iris_reseed(k, iris_seed(k));
+  if (!iris_train_begin(k, 0)) { say("TRAINING REFUSED - nothing to fit"); return; }
+  training = true;
+  say("learning - the curve will settle as it goes");
+}
+
+/* Called every pass. Does a slice if one is owed, then redraws so you can
+   watch the curve move rather than waiting for a finished one. */
+static void keep_training(void) {
+  if (!training) return;
+  iris_train_slice(k, 48);
+  if (iris_train_busy(k)) {
+    send_curve();                        /* the curve, mid-flight */
+    return;
+  }
+  training = false;
+  if (!iris_is_trained(k)) { say("TRAINING FAILED - the instrument is not fitted"); return; }
+  send_range();
+  send_demos();
+  send_curve();
+  check_spread();
+  say("trained");
+}
+
+void setup(void) {
+  Serial.begin(115200);
+  while (!Serial && millis() < 20000) delay(10);
+  delay(200);
+
+#if !USE_ANALOG
+  /* FIND THE SENSOR, DO NOT ASSUME IT. Every board puts I2C somewhere else,
+     and a plain Wire.begin() picks that board's default -- which on the Adafruit
+     Feather boards is NOT where the STEMMA QT connector is. Written the naive
+     way first, this sketch reported "no sensor" on a board with a perfectly
+     good sensor sitting on pins 16 and 15. So: try the default, then the pin
+     pairs the common ESP32-S3 boards actually use, and try both addresses on
+     each. Whatever answers first wins, and we say which so you can hardcode it
+     later if you want to. */
+  { static const int PINS[][2] = { {-1,-1}, {16,15}, {3,4}, {8,9}, {5,6},
+                                   {1,2}, {41,40}, {17,18}, {21,22} };
+    bool found = false;
+    for (unsigned i = 0; i < sizeof PINS / sizeof PINS[0] && !found; ++i) {
+      Wire.end(); delay(10);
+      if (PINS[i][0] < 0) { if (!Wire.begin()) continue; }
+      else                { if (!Wire.begin(PINS[i][0], PINS[i][1])) continue; }
+      delay(20);
+      for (int a = 0x28; a <= 0x29 && !found; ++a) {
+        bno = Adafruit_BNO055(55, (uint8_t)a, &Wire);
+        if (bno.begin()) {
+          found = true;
+          Serial.print(F("M found the BNO055 at 0x")); Serial.print(a, HEX);
+          if (PINS[i][0] < 0) Serial.println(F(" on the default pins"));
+          else { Serial.print(F(" on SDA ")); Serial.print(PINS[i][0]);
+                 Serial.print(F(" / SCL ")); Serial.println(PINS[i][1]); }
+        }
+      }
+    }
+    if (!found) {
+      say("No BNO055 anywhere. Run i2c_find to see what is on the bus,");
+      say("or set USE_ANALOG to 1 at the top and use a knob on A0 instead.");
+      for (;;) delay(1000);
+    } }
+#endif
+
+  k = iris_init(memory, sizeof memory, N_IN, N_HID, N_OUT, N_DEMOS, 1234u);
+  if (!k) { say("iris_init refused - check the shape at the top"); for (;;) delay(1000); }
+
+  say("ready. Move the sensor, then press SPACE to teach it this pose.");
+  say("Two poses is enough to see a curve. 'c' clears, 'd' deletes the last.");
+}
+
+void loop(void) {
+  float x = read_input();
+  if (x < seen_lo) seen_lo = x;
+  if (x > seen_hi) seen_hi = x;
+
+  if (Serial.available()) {
+    int c = Serial.read();
+
+    if (c == 'T') { read_target_from_serial(); }     /* where the click was */
+
+    else if (c == ' ') {                             /* teach it this pose */
+      float t[N_OUT];
+      t[0] = target0; t[1] = target1;
+      if (demos < N_DEMOS && iris_record(k, &x, t)) {
+        demo_x[demos] = x; demo_y0[demos] = t[0]; demo_y1[demos] = t[1];
+        demos++;
+        retrain_and_redraw();
+      } else {
+        /* Say WHICH refusal it was. "Full" when the truth was a bad reading
+           sends you to delete demonstrations you do not have. */
+        if (iris_get_status(k) == IRIS_STORE_FULL || demos >= N_DEMOS)
+          say("full - press 'd' to delete one first");
+        else
+          say("refused - that reading is not a number. Check the sensor.");
+      }
+    }
+    else if (c == 'd') {                             /* the repair loop */
+      if (demos > 0 && iris_delete_last(k)) {
+        demos--;
+        say("deleted the last demonstration");
+        if (demos >= 2) retrain_and_redraw();
+        else { send_range(); send_demos(); say("need two to draw a curve"); }
+      } else say("nothing to delete");
+    }
+    else if (c == 'c') {
+      iris_clear(k); demos = 0;
+      seen_lo = 1e30f; seen_hi = -1e30f;
+      say("cleared");
+    }
+  }
+
+  keep_training();                       /* a slice per pass, free when idle */
+
+  /* The live dot, about 30 times a second. Only the dot -- the curve is only
+     resent when the mapping actually changes, so the link stays quiet. */
+  if (demos >= 2) {
+    float out[N_OUT];
+    iris_predict(k, &x, out);
+    Serial.print(F("L ")); Serial.print(x, 4);
+    Serial.print(' ');     Serial.print(out[0], 4);
+    Serial.print(' ');     Serial.println(out[1], 4);
+  }
+  delay(30);
+}

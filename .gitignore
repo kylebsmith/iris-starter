@@ -1,0 +1,13 @@
+# Arduino build output
+build/
+*.hex
+*.elf
+*.bin
+*.map
+
+# Processing
+processing/*/applet/
+processing/*/application.*
+
+# macOS
+.DS_Store
