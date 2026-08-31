@@ -115,6 +115,12 @@ static void read_target_from_serial(void) {
   target1 = Serial.parseFloat();
   if (target0 < 0.0f) target0 = 0.0f;  if (target0 > 1.0f) target0 = 1.0f;
   if (target1 < 0.0f) target1 = 0.0f;  if (target1 > 1.0f) target1 = 1.0f;
+  /* Echo it. The plot draws the click immediately from its own numbers -- it
+     must, a serial round trip is far past the tenth of a second that makes an
+     action feel instantaneous -- and then confirms against this that the BOARD
+     has the same value. Two different facts, both worth showing. */
+  Serial.print(F("A ")); Serial.print(target0, 4);
+  Serial.print(' ');     Serial.println(target1, 4);
 }
 
 static void say(const char *m) { Serial.print(F("M ")); Serial.println(m); }
@@ -247,9 +253,19 @@ void setup(void) {
                                    {1,2}, {41,40}, {17,18}, {21,22} };
     bool found = false;
     for (unsigned i = 0; i < sizeof PINS / sizeof PINS[0] && !found; ++i) {
+      /* Only the ESP32 core lets you choose I2C pins or tells you whether the
+         bus came up: on AVR and RP2040, Wire.begin() returns void and takes no
+         arguments. Guarding this is what keeps this sketch -- the FIRST thing a
+         student runs -- buildable on a Pico and an Uno. Written the ESP32 way
+         first, it compiled only there, which is the wrong sketch to lose. */
+#if defined(ARDUINO_ARCH_ESP32)
       Wire.end(); delay(10);
       if (PINS[i][0] < 0) { if (!Wire.begin()) continue; }
       else                { if (!Wire.begin(PINS[i][0], PINS[i][1])) continue; }
+#else
+      if (PINS[i][0] >= 0) continue;   /* elsewhere there is one bus, the default */
+      Wire.begin();
+#endif
       delay(20);
       for (int a = 0x28; a <= 0x29 && !found; ++a) {
         bno = Adafruit_BNO055(55, (uint8_t)a, &Wire);
@@ -272,14 +288,33 @@ void setup(void) {
   k = iris_init(memory, sizeof memory, N_IN, N_HID, N_OUT, N_DEMOS, 1234u);
   if (!k) { say("iris_init refused - check the shape at the top"); for (;;) delay(1000); }
 
+  /* THE SENSOR'S PHYSICAL FULL SCALE, sent once. The plot draws its horizontal
+     axis against THIS and never rescales, because a silently rescaling axis is
+     the thing that made the picture unreadable -- and rescaling is known to
+     degrade value judgements even when it is animated (Heer & Robertson 2007).
+     The range actually visited is drawn as a band inside it instead, which
+     turns an invisible transformation into a visible, meaningful object: it is
+     the part of the range the network has any evidence about. */
+#if USE_ANALOG
+  Serial.println(F("X 0 1023 counts"));
+#else
+  Serial.println(F("X -9.81 9.81 m/s2"));   /* gravity, one axis */
+#endif
+
   say("ready. Move the sensor, then press SPACE to teach it this pose.");
   say("Two poses is enough to see a curve. 'c' clears, 'd' deletes the last.");
 }
 
 void loop(void) {
   float x = read_input();
-  if (x < seen_lo) seen_lo = x;
-  if (x > seen_hi) seen_hi = x;
+  /* Tell the plot when the visited range grows, rate-limited. It used to be
+     sent only after training, so between demonstrations the plot's idea of the
+     range was stale and it drew the live marker outside its own axes. */
+  { static uint32_t last_range = 0;
+    bool grew = false;
+    if (x < seen_lo) { seen_lo = x; grew = true; }
+    if (x > seen_hi) { seen_hi = x; grew = true; }
+    if (grew && millis() - last_range > 250) { send_range(); last_range = millis(); } }
 
   if (Serial.available()) {
     int c = Serial.read();
@@ -321,12 +356,21 @@ void loop(void) {
 
   /* The live dot, about 30 times a second. Only the dot -- the curve is only
      resent when the mapping actually changes, so the link stays quiet. */
-  if (demos >= 2) {
-    float out[N_OUT];
-    iris_predict(k, &x, out);
+  /* THE LIVE LINE GOES OUT FROM POWER-ON, TRAINED OR NOT.
+     This used to sit inside `if (demos >= 2)`, so the board said nothing at all
+     until the second demonstration existed. A student waving the sensor in
+     their first thirty seconds saw a dead window, clicked and saw nothing,
+     pressed SPACE and saw nothing -- six actions before any evidence the system
+     was alive. By then they have learned that their input does not matter, and
+     no amount of curve afterwards repairs that. Three tokens when untrained,
+     five when trained; the plot reads both. */
+  { float out[N_OUT];
     Serial.print(F("L ")); Serial.print(x, 4);
-    Serial.print(' ');     Serial.print(out[0], 4);
-    Serial.print(' ');     Serial.println(out[1], 4);
-  }
+    if (demos >= 2) {
+      iris_predict(k, &x, out);
+      Serial.print(' '); Serial.print(out[0], 4);
+      Serial.print(' '); Serial.print(out[1], 4);
+    }
+    Serial.println(); }
   delay(30);
 }

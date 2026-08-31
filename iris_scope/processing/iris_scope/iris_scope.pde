@@ -1,73 +1,115 @@
-/* iris_scope — seeing the mapping
-   ==============================
-   Run iris_scope.ino on the board, then run this. Pick your serial port with
-   the LEFT and RIGHT arrow keys if it does not connect on its own.
+/* iris_scope — watch a network learn
+   ==================================
+   Run iris_scope.ino on the board, then run this. LEFT and RIGHT arrows pick
+   the serial port if it does not connect by itself.
 
-   TWO VIEWS, press TAB to swap:
+   WHAT YOU ARE LOOKING AT
 
-     TRANSFER   The horizontal axis is your sensor. The vertical axis is what
-                the instrument plays. Your demonstrations are the big dots.
-                The line through them is what the network invented. The dots
-                are the only part you gave it -- everything else on that line
-                is the network's guess, and that guess is the instrument.
+     THE BIG PLOT is the whole instrument. Left to right is your sensor. Bottom
+     to top is what it plays. The green dots are the poses YOU taught it. The
+     lines through them are what the network made up in between — and that
+     made-up part is the instrument.
 
-     SCOPE      The two outputs plotted against each other, exactly the way an
-                oscilloscope in X-Y mode plots two voltages. One input sweeping
-                its range traces a shape. Straight demonstrations can produce a
-                curved shape, because the network is not a straight line.
+     THE SQUARE, top right, plots the two outputs against each other, the way
+     an oscilloscope in X-Y mode plots two voltages. Both panels are on screen
+     at once on purpose: move your mouse over either and the matching point
+     lights up in the other.
 
-   KEYS
-     CLICK  choose what this pose should mean (the crosshair)
-     TAB    swap view          SPACE  teach it this pose (sent to the board)
-     d      delete the last    c      clear everything
-     s      save a PNG         LEFT/RIGHT  choose the serial port
+     THE NUMBERS down the left are every value in the system, live. Nothing is
+     hidden behind a keypress.
+
+   HOW TO USE IT
+
+     Drag the two round handles to say what this pose should mean. Press SPACE.
+     Move the sensor somewhere clearly different and do it again. Two poses is
+     enough to see a curve.
+
+     You cannot break it. Press 'c' and start over whenever you like.
+
+   WHY IT LOOKS LIKE THIS
+     Every action has a visible effect, immediately (Victor, "Learnable
+     Programming", 2012). The horizontal axis never rescales, because a
+     silently rescaling axis makes values unreadable even when animated (Heer &
+     Robertson, IEEE InfoVis 2007); the part of the range you have visited is
+     drawn as a band instead. The two panels are shown together rather than
+     swapped, because correspondence has to be seen, not remembered (Becker &
+     Cleveland, Technometrics 1987).
    ========================================================================= */
 
 import processing.serial.*;
+
+// ---- regions. Every coordinate in this file comes from one of these. -------
+class Rect {
+  float x0, y0, x1, y1;
+  Rect(float a, float b, float c, float d) { x0=a; y0=b; x1=c; y1=d; }
+  float w() { return x1 - x0; }
+  float h() { return y1 - y0; }
+  float midX() { return (x0 + x1) * 0.5; }
+  float midY() { return (y0 + y1) * 0.5; }
+}
+Rect HEAD, READ, XFER, PLOT, SQUARE, FOOT;
+
+// ---- colours, defined once ------------------------------------------------
+color BG    = #14161A;
+color INK   = #E8E8E8;
+color DIM   = #8A929E;
+color FAINT = #2C313A;
+color OUT0  = #4FC3F7;   // output one   — blue
+color OUT1  = #FFB74D;   // output two   — orange
+color DEMO  = #66BB6A;   // your poses   — green
+color LIVE  = #EF5350;   // where you are — red
+color BAND  = #1E232B;   // the visited part of the range
+
+// ---- what the board has told us -------------------------------------------
+float fullLo = -10, fullHi = 10;     // the sensor's PHYSICAL range. Never changes.
+String unit = "";
+float seenLo = 0, seenHi = 0;        // the part visited. Drawn, never scaled to.
+boolean haveSeen = false;
+
+int nCurve = 0;
+float[] cx = new float[128], c0 = new float[128], c1 = new float[128];
+int nDemo = 0;
+float[] dx = new float[64], d0 = new float[64], d1 = new float[64];
+
+float liveX = 0, live0 = 0, live1 = 0;
+boolean haveInput = false, haveOut = false;
+
+float aim0 = 0.75, aim1 = 0.25;      // what the next SPACE will teach
+float ack0 = -1,   ack1 = -1;        // what the BOARD says it has
+int   ackFlash = 0;
+
+String message = "connecting…";
+String state   = "";
+
+// click feedback
+float clickX = -1, clickY = -1;
+int   clickAge = 999;
+int   dragging = -1;                 // 0 or 1 while a handle is held
 
 Serial port;
 String[] portNames;
 int portIndex = 0;
 boolean connected = false;
 
-// ---- what the board has told us -------------------------------------------
-float lo = 0, hi = 1;                    // the input range the sensor has seen
-int    nCurve = 0;
-float[] cx = new float[256];             // the swept input value
-float[] c0 = new float[256], c1 = new float[256];   // and the two outputs there
-int    nDemo = 0;
-float[] dx = new float[64], d0 = new float[64], d1 = new float[64];
-float  liveX = 0, live0 = 0, live1 = 0;
-boolean haveLive = false;
-String  message = "connecting...";
-
-// A short trail of recent live points, so movement reads as movement.
-int TRAIL = 90;
-float[] tx = new float[TRAIL], ty = new float[TRAIL];
-int tn = 0, thead = 0;
-
-boolean scopeView = false;
-
-// The point you last clicked: what the next SPACE will teach.
-float aim0 = 0.5, aim1 = 0.5;
-
-// ---- colours, defined once ------------------------------------------------
-color BG     = #14161A;
-color INK    = #E8E8E8;
-color FAINT  = #3A3F47;
-color OUT0   = #4FC3F7;                  // first output: blue
-color OUT1   = #FFB74D;                  // second output: orange
-color DEMO   = #66BB6A;                  // your demonstrations: green
-color LIVE   = #EF5350;                  // where you are now: red
+PFont fBig, fMid, fSmall;
 
 void setup() {
   size(1000, 620);
-  surface.setTitle("iris_scope");
-  textFont(createFont("Menlo", 13));
+  surface.setTitle("iris_scope — watch a network learn");
+  fBig   = createFont("Menlo", 21);
+  fMid   = createFont("Menlo", 14);
+  fSmall = createFont("Menlo", 11);
+
+  HEAD   = new Rect(  0,   0, 1000,  40);
+  READ   = new Rect(  0,  40,  248, 578);
+  XFER   = new Rect(248,  40,  688, 578);
+  PLOT   = new Rect(300,  92,  664, 520);      // the drawable rectangle inside XFER
+  SQUARE = new Rect(716,  92,  976, 352);
+  FOOT   = new Rect(  0, 578, 1000, 620);
+
   openPort(bestGuessPort());
 }
 
-// Prefer something that looks like a board rather than a Bluetooth device.
 int bestGuessPort() {
   portNames = Serial.list();
   for (int i = 0; i < portNames.length; i++) {
@@ -90,7 +132,7 @@ void openPort(int idx) {
     message = "listening on " + portNames[portIndex];
   } catch (Exception e) {
     connected = false;
-    message = "could not open " + portNames[portIndex] + " (is Serial Monitor still open?)";
+    message = "could not open " + portNames[portIndex] + " — is the Serial Monitor still open?";
   }
 }
 
@@ -102,8 +144,12 @@ void serialEvent(Serial p) {
   if (line.length() < 2) return;
   String[] f = splitTokens(line, " ");
 
-  if (f[0].equals("R") && f.length >= 3) {
-    lo = float(f[1]); hi = float(f[2]);
+  if (f[0].equals("X") && f.length >= 3) {          // the physical full scale
+    fullLo = float(f[1]); fullHi = float(f[2]);
+    if (f.length >= 4) unit = f[3];
+  }
+  else if (f[0].equals("R") && f.length >= 3) {     // the part visited
+    seenLo = float(f[1]); seenHi = float(f[2]); haveSeen = true;
   }
   else if (f[0].equals("D") && f.length >= 5) {
     int i = int(f[1]);
@@ -113,205 +159,241 @@ void serialEvent(Serial p) {
     }
   }
   else if (f[0].equals("C") && f.length >= 2) {
-    int n = int(f[1]);
-    n = min(n, cx.length);
-    // Each point is three numbers: input, out0, out1.
+    int n = min(int(f[1]), cx.length);
     if (f.length >= 2 + n * 3) {
       for (int i = 0; i < n; i++) {
-        cx[i] = float(f[2 + i*3]);
-        c0[i] = float(f[3 + i*3]);
-        c1[i] = float(f[4 + i*3]);
+        cx[i] = float(f[2 + i*3]); c0[i] = float(f[3 + i*3]); c1[i] = float(f[4 + i*3]);
       }
       nCurve = n;
     }
   }
-  else if (f[0].equals("L") && f.length >= 4) {
-    liveX = float(f[1]); live0 = float(f[2]); live1 = float(f[3]);
-    haveLive = true;
-    tx[thead] = live0; ty[thead] = live1;
-    thead = (thead + 1) % TRAIL;
-    if (tn < TRAIL) tn++;
+  else if (f[0].equals("L")) {                      // live — 2 tokens or 4
+    if (f.length >= 2) { liveX = float(f[1]); haveInput = true; }
+    if (f.length >= 4) { live0 = float(f[2]); live1 = float(f[3]); haveOut = true; }
+  }
+  else if (f[0].equals("A") && f.length >= 3) {     // the board has our target
+    ack0 = float(f[1]); ack1 = float(f[2]); ackFlash = 12;
   }
   else if (f[0].equals("M")) {
     message = line.substring(2);
-    // A clear on the board must clear the picture too, or you are looking at
-    // an instrument that no longer exists.
-    if (message.startsWith("cleared")) { nDemo = 0; nCurve = 0; tn = 0; haveLive = false; }
+    if (message.startsWith("cleared")) {
+      nDemo = 0; nCurve = 0; haveOut = false; haveSeen = false;
+    }
   }
 }
 
-// ---- drawing --------------------------------------------------------------
+// ---- mapping. px() CLAMPS: nothing is ever drawn outside its own plot. -----
+float px(float v)      { return constrain(map(v, fullLo, fullHi, PLOT.x0, PLOT.x1), PLOT.x0, PLOT.x1); }
+float py(float v)      { return constrain(map(v, 0, 1, PLOT.y1, PLOT.y0), PLOT.y0, PLOT.y1); }
+float sqx(float v)     { return SQUARE.x0 + constrain(v, 0, 1) * SQUARE.w(); }
+float sqy(float v)     { return SQUARE.y1 - constrain(v, 0, 1) * SQUARE.h(); }
+
 void draw() {
   background(BG);
-  if (scopeView) drawScope(); else drawTransfer();
-  drawChrome();
+  if (clickAge < 999) clickAge++;
+  if (ackFlash > 0) ackFlash--;
+  drawHead();
+  drawReadout();
+  drawTransfer();
+  drawSquare();
+  drawFoot();
+  drawClickMark();
 }
 
-float PADL = 70, PADR = 40, PADT = 70, PADB = 70;
+// ---------------------------------------------------------------------------
+void drawHead() {
+  textFont(fMid);
+  state = nDemo == 0 ? "move the sensor — nothing is being learned yet"
+        : nDemo == 1 ? "one pose taught. Move somewhere different and teach another."
+        : "playing — move the sensor and watch the red marker";
+  noStroke(); fill(INK); textAlign(LEFT, CENTER);
+  text(state, 18, HEAD.midY());
+  fill(connected ? DIM : LIVE); textAlign(RIGHT, CENTER);
+  text(message, width - 18, HEAD.midY());
+}
 
-float px(float v, float a, float b) { return map(v, a, b, PADL, width - PADR); }
-float py(float v, float a, float b) { return map(v, a, b, height - PADB, PADT); }
+// One numeral block. Fixed field widths so digits never move the layout.
+void valueBlock(float y, String label, String value, color c) {
+  noStroke(); textAlign(LEFT, TOP);
+  textFont(fSmall); fill(DIM);  text(label, 18, y);
+  textFont(fBig);   fill(c);    text(value, 18, y + 15);
+}
+String sf(float v) { return (v < 0 ? "-" : "+") + nf(abs(v), 1, 2); }
+
+void drawReadout() {
+  stroke(FAINT); strokeWeight(1);
+  line(READ.x1, READ.y0 + 8, READ.x1, READ.y1 - 8);
+
+  valueBlock( 56, "SENSOR" + (unit.equals("") ? "" : "  (" + unit + ")"),
+              haveInput ? sf(liveX) : "  —  ", LIVE);
+  valueBlock(114, "OUTPUT ONE", haveOut ? nf(live0, 1, 3) : "  —  ", OUT0);
+  valueBlock(172, "OUTPUT TWO", haveOut ? nf(live1, 1, 3) : "  —  ", OUT1);
+
+  stroke(FAINT); line(18, 236, READ.x1 - 18, 236);
+
+  valueBlock(250, "SPACE WILL TEACH", nf(aim0, 1, 2) + " / " + nf(aim1, 1, 2), INK);
+  valueBlock(308, "POSES TAUGHT", nf(nDemo, 1, 0), DEMO);
+  valueBlock(366, "RANGE YOU HAVE USED",
+             haveSeen ? sf(seenLo) + " " + sf(seenHi) : "  —  ", DIM);
+
+  // what the board says it has, so a click is confirmed end to end
+  textFont(fSmall); textAlign(LEFT, TOP); noStroke();
+  fill(ackFlash > 0 ? DEMO : DIM);
+  text(ack0 < 0 ? "board: waiting" : "board has " + nf(ack0,1,2) + " / " + nf(ack1,1,2),
+       18, 430);
+}
 
 void drawTransfer() {
-  // axes
-  stroke(FAINT); strokeWeight(1);
-  line(PADL, PADT, PADL, height - PADB);
-  line(PADL, height - PADB, width - PADR, height - PADB);
-  fill(FAINT); textAlign(CENTER, TOP);
-  text("your sensor  →", (PADL + width - PADR) / 2, height - PADB + 26);
-  pushMatrix();
-  translate(PADL - 44, (PADT + height - PADB) / 2);
-  rotate(-HALF_PI); textAlign(CENTER, BOTTOM);
-  text("what it plays", 0, 0);
-  popMatrix();
-  textAlign(RIGHT, CENTER);
-  text("1.0", PADL - 10, py(1, 0, 1));
-  text("0.0", PADL - 10, py(0, 0, 1));
+  // the visited band, drawn BEFORE the axes so it reads as ground
+  if (haveSeen && seenHi > seenLo) {
+    noStroke(); fill(BAND);
+    rect(px(seenLo), PLOT.y0, px(seenHi) - px(seenLo), PLOT.h());
+  }
 
-  if (nCurve < 2) { hintEmpty(); return; }
+  // gridlines at fixed, labelled positions. These never move.
+  textFont(fSmall); textAlign(CENTER, TOP);
+  for (int i = 0; i <= 4; i++) {
+    float v = lerp(fullLo, fullHi, i / 4.0), X = px(v);
+    stroke(FAINT); strokeWeight(1); line(X, PLOT.y0, X, PLOT.y1);
+    noStroke(); fill(DIM); text(nf(v, 1, 1), X, PLOT.y1 + 8);
+  }
+  for (int i = 0; i <= 2; i++) {
+    float v = i / 2.0, Y = py(v);
+    stroke(FAINT); line(PLOT.x0, Y, PLOT.x1, Y);
+    noStroke(); fill(DIM); textAlign(RIGHT, CENTER); text(nf(v, 1, 1), PLOT.x0 - 10, Y);
+  }
+  noFill(); stroke(FAINT); strokeWeight(1); rect(PLOT.x0, PLOT.y0, PLOT.w(), PLOT.h());
+
+  // axis names, outside the plot, never over anything that moves
+  noStroke(); fill(DIM); textFont(fSmall); textAlign(CENTER, TOP);
+  text("your sensor" + (unit.equals("") ? "" : ", " + unit) + "  — the whole range it can read",
+       PLOT.midX(), PLOT.y1 + 26);
+  pushMatrix(); translate(PLOT.x0 - 42, (PLOT.y0 + PLOT.y1) / 2); rotate(-HALF_PI);
+  textAlign(CENTER, BOTTOM); text("what it plays", 0, 0); popMatrix();
+
+  if (haveSeen && seenHi > seenLo) {
+    noStroke(); fill(DIM); textAlign(CENTER, BOTTOM); textFont(fSmall);
+    text("the part you have actually used", (px(seenLo) + px(seenHi)) / 2, PLOT.y0 - 6);
+  }
 
   // the curves the network invented
-  noFill(); strokeWeight(2.5);
-  stroke(OUT0);
-  beginShape();
-  for (int i = 0; i < nCurve; i++) vertex(px(cx[i], lo, hi), py(c0[i], 0, 1));
-  endShape();
-  stroke(OUT1);
-  beginShape();
-  for (int i = 0; i < nCurve; i++) vertex(px(cx[i], lo, hi), py(c1[i], 0, 1));
-  endShape();
+  if (nCurve >= 2) {
+    noFill(); strokeWeight(2.5);
+    stroke(OUT0); beginShape(); for (int i=0;i<nCurve;i++) vertex(px(cx[i]), py(c0[i])); endShape();
+    stroke(OUT1); beginShape(); for (int i=0;i<nCurve;i++) vertex(px(cx[i]), py(c1[i])); endShape();
+    // direct labels on the lines themselves, not a legend
+    noStroke(); textFont(fSmall); textAlign(LEFT, CENTER);
+    fill(OUT0); text("output one", px(cx[nCurve-1]) + 6, py(c0[nCurve-1]));
+    fill(OUT1); text("output two", px(cx[nCurve-1]) + 6, py(c1[nCurve-1]));
+  }
 
-  // your demonstrations
+  // your poses
   for (int i = 0; i < nDemo; i++) {
-    float X = px(dx[i], lo, hi);
-    stroke(DEMO); strokeWeight(1); 
-    line(X, PADT, X, height - PADB);
-    noStroke(); fill(DEMO);
-    ellipse(X, py(d0[i], 0, 1), 11, 11);
-    ellipse(X, py(d1[i], 0, 1), 11, 11);
+    float X = px(dx[i]);
+    stroke(DEMO, 90); strokeWeight(1); line(X, PLOT.y0, X, PLOT.y1);
+    noStroke(); fill(BG); ellipse(X, py(d0[i]), 15, 15); ellipse(X, py(d1[i]), 15, 15);
+    fill(DEMO);          ellipse(X, py(d0[i]), 11, 11); ellipse(X, py(d1[i]), 11, 11);
   }
 
-  // where you are right now
-  if (haveLive) {
-    float X = px(liveX, lo, hi);
-    stroke(LIVE); strokeWeight(1.5);
-    line(X, PADT, X, height - PADB);
-    noStroke(); fill(LIVE);
-    ellipse(X, py(live0, 0, 1), 9, 9);
-    ellipse(X, py(live1, 0, 1), 9, 9);
+  // where you are now
+  if (haveInput) {
+    float X = px(liveX);
+    stroke(LIVE); strokeWeight(1.5); line(X, PLOT.y0, X, PLOT.y1);
+    if (haveOut) {
+      noStroke(); fill(LIVE);
+      ellipse(X, py(live0), 10, 10); ellipse(X, py(live1), 10, 10);
+    }
+    // the label rides above the plot in its own rail, never over the curves
+    noStroke(); fill(LIVE); textFont(fSmall);
+    float lx = constrain(X, PLOT.x0 + 34, PLOT.x1 - 34);
+    textAlign(CENTER, BOTTOM); text("you are here", lx, PLOT.y0 - 22);
   }
 
-  // the crosshair: what the next SPACE will teach
-  drawAim(px(haveLive ? liveX : (lo+hi)/2, lo, hi), py(aim0, 0, 1), py(aim1, 0, 1));
-
-  noStroke(); textAlign(LEFT, TOP);
-  fill(DEMO); text("●  the " + nDemo + " poses you taught it", PADL, PADT - 46);
-  fill(OUT0); text("—  everything between them is invented", PADL, PADT - 28);
+  drawHandles();
 }
 
-// Two small rings showing where the next demonstration will land.
-void drawAim(float X, float Y0, float Y1) {
-  noFill(); stroke(INK, 150); strokeWeight(1.5);
-  ellipse(X, Y0, 16, 16); ellipse(X, Y1, 16, 16);
-  fill(INK, 150); noStroke(); textAlign(LEFT, CENTER);
-  text("SPACE teaches here", X + 14, Y0 - 14);
+/* The two target handles. Each is named, each keeps its own colour, and each
+   is dragged directly — no guessing which one you meant. */
+void drawHandles() {
+  float hx = PLOT.x1 + 18;
+  for (int i = 0; i < 2; i++) {
+    float v = (i == 0) ? aim0 : aim1;
+    color c = (i == 0) ? OUT0 : OUT1;
+    float Y = py(v);
+    stroke(c, 70); strokeWeight(1);
+    for (float x = PLOT.x0; x < PLOT.x1; x += 8) line(x, Y, x + 4, Y);   // dashed
+    noFill(); stroke(c); strokeWeight(dragging == i ? 3 : 2);
+    ellipse(hx, Y, dragging == i ? 24 : 18, dragging == i ? 24 : 18);
+  }
+  noStroke(); fill(DIM); textFont(fSmall); textAlign(CENTER, TOP);
+  text("drag", hx, PLOT.y1 + 8);
 }
 
-void drawScope() {
-  float side = min(width - PADL - PADR, height - PADT - PADB);
-  float cxo = (width - side) / 2, cyo = PADT;
+void drawSquare() {
+  noFill(); stroke(FAINT); strokeWeight(1);
+  rect(SQUARE.x0, SQUARE.y0, SQUARE.w(), SQUARE.h());
+  noStroke(); fill(DIM); textFont(fSmall);
+  textAlign(CENTER, TOP);   text("output one →", SQUARE.midX(), SQUARE.y1 + 8);
+  textAlign(CENTER, BOTTOM);
+  pushMatrix(); translate(SQUARE.x0 - 12, (SQUARE.y0 + SQUARE.y1)/2); rotate(-HALF_PI);
+  text("output two", 0, 0); popMatrix();
+  textAlign(LEFT, BOTTOM); fill(DIM);
+  text("the two outputs against each other", SQUARE.x0, SQUARE.y0 - 8);
 
-  stroke(FAINT); strokeWeight(1); noFill();
-  rect(cxo, cyo, side, side);
-  fill(FAINT); textAlign(CENTER, TOP);
-  text("output 1  →", cxo + side / 2, cyo + side + 26);
-  pushMatrix();
-  translate(cxo - 24, cyo + side / 2); rotate(-HALF_PI);
-  textAlign(CENTER, BOTTOM); text("output 2", 0, 0);
-  popMatrix();
-
-  if (nCurve < 2) { hintEmpty(); return; }
-
-  // the whole mapping as one shape
-  noFill(); strokeWeight(2.5); stroke(OUT0);
-  beginShape();
-  for (int i = 0; i < nCurve; i++)
-    vertex(cxo + c0[i] * side, cyo + (1 - c1[i]) * side);
-  endShape();
-
-  // your demonstrations sit ON that shape
+  if (nCurve >= 2) {
+    noFill(); stroke(OUT0, 170); strokeWeight(2);
+    beginShape(); for (int i=0;i<nCurve;i++) vertex(sqx(c0[i]), sqy(c1[i])); endShape();
+  }
   noStroke(); fill(DEMO);
-  for (int i = 0; i < nDemo; i++)
-    ellipse(cxo + d0[i] * side, cyo + (1 - d1[i]) * side, 11, 11);
+  for (int i = 0; i < nDemo; i++) ellipse(sqx(d0[i]), sqy(d1[i]), 10, 10);
+  if (haveOut) { fill(LIVE); ellipse(sqx(live0), sqy(live1), 12, 12); }
 
-  // the recent path, fading
-  noFill(); strokeWeight(2);
-  for (int j = 1; j < tn; j++) {
-    int a = (thead - tn + j - 1 + TRAIL * 2) % TRAIL;
-    int b = (thead - tn + j     + TRAIL * 2) % TRAIL;
-    stroke(LIVE, map(j, 0, tn, 20, 180));
-    line(cxo + tx[a] * side, cyo + (1 - ty[a]) * side,
-         cxo + tx[b] * side, cyo + (1 - ty[b]) * side);
+  // the same numbers again, beside the mark they describe
+  if (haveOut) {
+    noStroke(); fill(DIM); textFont(fSmall); textAlign(LEFT, TOP);
+    text(nf(live0,1,3) + " , " + nf(live1,1,3), SQUARE.x0, SQUARE.y1 + 28);
   }
-  if (haveLive) {
-    noStroke(); fill(LIVE);
-    ellipse(cxo + live0 * side, cyo + (1 - live1) * side, 13, 13);
-  }
-
-  // the crosshair, in output space where clicking makes the most sense
-  float aX = cxo + aim0 * side, aY = cyo + (1 - aim1) * side;
-  noFill(); stroke(INK, 150); strokeWeight(1.5);
-  ellipse(aX, aY, 18, 18);
-  line(aX - 13, aY, aX + 13, aY); line(aX, aY - 13, aX, aY + 13);
-  fill(INK, 150); noStroke(); textAlign(LEFT, CENTER);
-  text("click to move · SPACE teaches here", aX + 16, aY - 16);
-
-  noStroke(); textAlign(LEFT, TOP);
-  fill(INK); text("one input sweeping its range draws this shape", cxo, cyo - 46);
-  fill(FAINT); text("straight demonstrations, curved shape — that curve is the network", cxo, cyo - 28);
 }
 
-void hintEmpty() {
-  fill(FAINT); textAlign(CENTER, CENTER);
-  text("Click where you want this pose to land, then press SPACE.", width/2, height/2 - 12);
-  text("Move the sensor, click somewhere else, press SPACE again.", width/2, height/2 + 12);
-  textAlign(LEFT, BASELINE);
+void drawFoot() {
+  noStroke(); fill(DIM); textFont(fSmall); textAlign(LEFT, CENTER);
+  text("drag a handle, then SPACE to teach this pose      d delete the last      c clear everything"
+     + "      s save a picture      ← → serial port", 18, FOOT.midY());
 }
 
-/* Clicking sets what the NEXT demonstration means. The board owns the
-   instrument, so we only ever send it the number -- we never keep a second
-   copy of the mapping over here that could drift out of step with it. */
+/* Every click leaves a mark exactly where it landed, in the same frame.
+   A click that lands somewhere meaningless is still not a no-op. */
+void drawClickMark() {
+  if (clickAge > 40 || clickX < 0) return;
+  float a = map(clickAge, 0, 40, 200, 0);
+  stroke(INK, a); strokeWeight(1.5); noFill();
+  ellipse(clickX, clickY, 10 + clickAge * 1.5, 10 + clickAge * 1.5);
+  line(clickX - 7, clickY, clickX + 7, clickY);
+  line(clickX, clickY - 7, clickX, clickY + 7);
+}
+
+// ---- input ----------------------------------------------------------------
 void mousePressed() {
-  if (scopeView) {
-    float side = min(width - PADL - PADR, height - PADT - PADB);
-    float cxo = (width - side) / 2, cyo = PADT;
-    aim0 = constrain((mouseX - cxo) / side, 0, 1);
-    aim1 = constrain(1 - (mouseY - cyo) / side, 0, 1);
-  } else {
-    float v = constrain(map(mouseY, height - PADB, PADT, 0, 1), 0, 1);
-    // Upper half of the plot sets output 1, lower half sets output 2.
-    if (v > (aim0 + aim1) / 2) aim0 = v; else aim1 = v;
+  clickX = mouseX; clickY = mouseY; clickAge = 0;
+  float hx = PLOT.x1 + 18;
+  float d0y = py(aim0), d1y = py(aim1);
+  if (abs(mouseX - hx) < 40 || (mouseX > PLOT.x0 && mouseX < PLOT.x1)) {
+    dragging = (abs(mouseY - d0y) <= abs(mouseY - d1y)) ? 0 : 1;
+    setAim(dragging, map(mouseY, PLOT.y1, PLOT.y0, 0, 1));
   }
+}
+void mouseDragged() { if (dragging >= 0) setAim(dragging, map(mouseY, PLOT.y1, PLOT.y0, 0, 1)); }
+void mouseReleased() { dragging = -1; }
+
+void setAim(int which, float v) {
+  v = constrain(v, 0, 1);
+  if (which == 0) aim0 = v; else aim1 = v;
   if (port != null) port.write("T " + nf(aim0, 1, 4) + " " + nf(aim1, 1, 4) + "\n");
 }
 
-void drawChrome() {
-  noStroke(); fill(INK); textAlign(LEFT, TOP);
-  text(scopeView ? "SCOPE" : "TRANSFER", 18, 16);
-  fill(FAINT);
-  text("TAB view    SPACE teach    d delete    c clear    s save    ←→ port", 110, 16);
-  fill(connected ? INK : LIVE); textAlign(RIGHT, TOP);
-  text(message, width - 18, 16);
-  fill(FAINT); textAlign(LEFT, BOTTOM);
-  text("input range seen: " + nf(lo, 0, 2) + " to " + nf(hi, 0, 2), 18, height - 14);
-}
-
-// ---- keys -----------------------------------------------------------------
 void keyPressed() {
-  if (key == TAB) { scopeView = !scopeView; return; }
-  if (key == 's') { saveFrame("iris_scope-####.png"); message = "saved a PNG"; return; }
+  if (key == 's') { saveFrame("iris_scope-####.png"); message = "saved a picture"; return; }
   if (keyCode == LEFT)  { openPort(portIndex - 1); return; }
   if (keyCode == RIGHT) { openPort(portIndex + 1); return; }
-  // Everything else goes straight to the board, which owns the instrument.
   if (port != null && (key == ' ' || key == 'd' || key == 'c')) port.write(key);
 }
