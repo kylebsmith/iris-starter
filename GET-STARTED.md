@@ -194,7 +194,7 @@ bytes of free stack.
 **Only `boilerplate/any_sensor/` builds for an Uno — 1 of the 10 sketches here.**
 Measured 2026-08-30 with `arduino-cli compile --fqbn arduino:avr:uno` on all ten.
 That is not a defect: the other nine need a screen, an ESP32's USB stack, or
-more RAM than an Uno has, and `boilerplate/today/` says so with a build error.
+more RAM than an Uno has, and `boilerplate/bno055_portable/` says so with a build error.
 The rest fail with compiler messages rather than an explanation, which is worth
 knowing before you try one.
 

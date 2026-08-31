@@ -10,8 +10,9 @@ work before anyone asks you to understand it.
 
 ```
 boilerplate/
-  any_sensor/            start here if you do not have the exact board
-  stemma_bno055/         the same thing wired to a real I2C sensor
+  any_sensor/            any sensor, any board — start here
+  bno055_portable/       a real motion sensor, on almost any board
+  stemma_bno055/         the same, ESP32 only, and it remembers after a reboot
 iris_tilt/
   iris_tilt.ino          175 lines of code — learn it, print it
   iris.h                 the library

@@ -28,6 +28,17 @@
 #define IRIS_MAX_OUT 4
 #define IRIS_MAX_HID 12
 #endif
+/* AND THE OPPOSITE, IF YOUR BOARD IS A MODERN ONE. None of the four lines
+   above happen unless you are compiling for an 8-bit AVR, so on an ESP32, a
+   Pico, an STM32 or a Teensy the library's own ceilings apply instead: 32
+   inputs, 16 outputs, 64 hidden units. The 2 / 3 / 16 you are about to read is
+   a starting point, not a limit, and on a modern board you are nowhere near
+   one. Measured, this same file, unchanged: on an ESP32-S3 it uses 13% of
+   memory and leaves 282,440 bytes free; on an Uno it uses 81% and leaves 371.
+   So if you have the newer board, raising N_INPUTS for a sensor with more axes
+   -- or N_DEMOS because you want to teach it a longer piece -- costs you
+   nothing you will notice. Raise the three ceilings above with it if you go
+   past 4 in, 4 out or 12 hidden; iris_init refuses rather than truncating. */
 #include "iris.h"
 
 /* ---- FILL THIS IN 1: HOW BIG IS YOUR INSTRUMENT? ------------------------
@@ -44,7 +55,19 @@
 #define N_DEMOS   16
 
 #define SAVE_BTN 0          /* the BOOT button on most boards */
-#define ADC_MAX  4095.0f    /* 4095 on an ESP32, 1023 on many others */
+/* An ESP32's analogue inputs are 12-bit and read up to 4095. Almost everything
+   else in the Arduino world is 10-bit and reads up to 1023. This used to be a
+   flat 4095 with a comment telling you to change it, which meant the sketch
+   written to run anywhere had one board's number baked into it: on an Uno the
+   knobs reached a quarter of their travel and read_target handed send_sound
+   0.0 to 0.25, while FILL THIS IN 4 promised 0.0 to 1.0. It still trained --
+   iris fits its output range to what you demonstrate -- so nothing announced
+   the problem. Ask the compiler instead. */
+#if defined(ARDUINO_ARCH_ESP32)
+#define ADC_MAX  4095.0f
+#else
+#define ADC_MAX  1023.0f
+#endif
 
 /* One knob per output. There must be exactly N_OUTPUTS of them. */
 static const int POT_PIN[] = { 4, 5, 6 };

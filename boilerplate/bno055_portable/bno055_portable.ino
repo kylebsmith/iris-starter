@@ -1,16 +1,26 @@
-/* BOILERPLATE — accelerometer in, three parameters out.
+/* BOILERPLATE — a real motion sensor, on almost any board.
+   =========================================================
    Pose the board, set the three knobs to the sound you want, press SAVE.
-   Two saves and it starts playing.                     TODAY'S INTERFACE. */
+   Two saves and it starts playing.
+
+   THIS IS THE PORTABLE ONE, and that is the whole reason it exists.
+   boilerplate/stemma_bno055 is the same instrument with more in it -- it saves
+   what you taught it to flash, so the instrument survives a reboot -- but
+   Preferences.h and Wire.begin(SDA, SCL) are Espressif calls, so that file
+   builds on an ESP32 and nowhere else. This one uses neither. Measured
+   compiling on a Raspberry Pi Pico (68,896 bytes) and an ESP32-S3, and
+   refusing an Uno below with an explanation instead of a compiler error.
+   ========================================================================= */
 #include <Wire.h>
 #include <Adafruit_BNO055.h>
 /* NOT FOR AN 8-BIT AVR. The Adafruit BNO055 driver plus this sketch's globals
    leave about 80 bytes of stack on an Uno, and training needs roughly 200. It
    would compile, flash, and then corrupt memory the first time you pressed
    record -- silently, which is the worst way for it to fail. If you are on an
-   Uno use boilerplate/any_sensor, which is the same instrument sized to fit.
+   Uno use boilerplate/any_sensor: the same instrument, and it shrinks to fit.
    Delete these four lines if you know what you are doing and have measured it. */
 #if defined(__AVR__)
-#error "today.ino needs more RAM than an AVR has. Use boilerplate/any_sensor on an Uno."
+#error "bno055_portable.ino needs more RAM than an AVR has. Use boilerplate/any_sensor on an Uno."
 #endif
 #include "iris.h"
 
@@ -18,6 +28,19 @@
 #define POT_A 4
 #define POT_B 5
 #define POT_C 6
+
+/* An ESP32's analogue inputs are 12-bit and read up to 4095. Almost everything
+   else in the Arduino world is 10-bit and reads up to 1023. Dividing by the
+   wrong one does not crash: iris fits its output range to whatever you
+   actually demonstrate, so it still trains. It just means your knobs would
+   only ever reach a quarter of their travel, and send the sound 0.0 to 0.25
+   where every comment in this file promises 0.0 to 1.0. This file runs on both
+   kinds of board, so it has to ask which one it is on. */
+#if defined(ARDUINO_ARCH_ESP32)
+#define ADC_MAX 4095.0f
+#else
+#define ADC_MAX 1023.0f
+#endif
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
 
@@ -86,9 +109,9 @@ void loop() {
   float out[3];
 
   if (digitalRead(SAVE_BTN) == LOW) {
-    out[0] = analogRead(POT_A) / 4095.0f;
-    out[1] = analogRead(POT_B) / 4095.0f;
-    out[2] = analogRead(POT_C) / 4095.0f;
+    out[0] = analogRead(POT_A) / ADC_MAX;
+    out[1] = analogRead(POT_B) / ADC_MAX;
+    out[2] = analogRead(POT_C) / ADC_MAX;
     /* Ask WHY it refused -- see stemma_bno055. "full" is only one of three
        reasons, and it is the least likely one on a fresh board. */
     if (!iris_record(k, in, out)) {

@@ -38,6 +38,8 @@
 #define N_DEMOS   16
 
 #define SAVE_BTN  0
+/* Not conditional, unlike the two portable sketches: this file cannot build
+   anywhere but an ESP32 (Preferences.h, above), and 4095 is that chip's. */
 #define ADC_MAX   4095.0f
 #define SDA_PIN   16        /* your board's I2C pins; on many boards Wire.begin() */
 #define SCL_PIN   15        /* with no arguments is already correct */
