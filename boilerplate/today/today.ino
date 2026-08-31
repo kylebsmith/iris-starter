@@ -98,7 +98,18 @@ void loop() {
         Serial.println(F("refused: a reading or a target is not a number. "
                          "Check the wiring."));
     }
-    else if (++demos >= 2) start_training();
+    else {
+      /* SAY SO ON EVERY SUCCESSFUL RECORD, not only on failure. This used to
+         print nothing at all when the first save worked -- ++demos made it 1,
+         the >= 2 test was false, and the board went silent. So a FAILED save
+         was loud and a SUCCESSFUL one was invisible, which is backwards, and it
+         taught a student on their very first press that the button does
+         nothing. Every other sketch here prints a count; this one did not. */
+      ++demos;
+      Serial.print(F("saved. demonstrations: ")); Serial.println(demos);
+      if (demos >= 2) start_training();
+      else Serial.println(F("one more, somewhere different, and it will play."));
+    }
     delay(300);
   }
 
