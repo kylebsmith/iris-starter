@@ -16,8 +16,9 @@
 /* ON A SMALL BOARD THE WORKING ARRAYS ARE THE STACK BUDGET.
    iris.h sizes nine internal arrays from these maxima rather than from the
    shape you asked for, so on an Uno the default 32/16/64 reserves 192 bytes of
-   stack for an instrument that uses 20. Measured with avr-gcc -Os: the deepest
-   frame goes from 340 bytes to 132 when they are shrunk to fit. An Uno leaves
+   stack for an instrument that uses 20. Measured with avr-gcc 7.3.0 -Os
+   -fstack-usage: the deepest frame goes from 308 bytes to 148 when they are
+   shrunk to fit -- a saving of 160. An Uno leaves
    only a few hundred bytes of stack, so this is the difference between
    training and quietly running off the end of it.
    They must be at least as large as N_INPUTS, N_OUTPUTS and the hidden width

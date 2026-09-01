@@ -94,7 +94,7 @@ wasn't.
 
 The sketches refuse to build with either of those wrong -- seven of the ten
 carry at least one guard and six check USB Mode specifically, including every
-sketch on this page -- and the error
+sketch in the walkthrough above -- and the error
 names the menu item to fix. If you see a red message mentioning USB Mode, that
 is this check doing its job — read it, change the setting, upload again. It is
 the only mistake here the compiler can catch for you, which is why it does.
@@ -196,8 +196,9 @@ compiling *and* training, which are different claims. On the Uno the whole
 thing fits in 2 kilobytes of RAM with about 176 bytes of stack to spare, and it
 only fits because the file shrinks the library's working arrays on AVR (see the
 `IRIS_MAX_IN` block at the top). Measured with `avr-gcc -Os -fstack-usage`:
-the deepest frame is 128 bytes with that block and 288 without it, against 376
-bytes of free stack.
+the deepest frame is 148 bytes with that block and 308 without it, measured
+from a caller with locals of its own; a bare caller measures 128 and 288.
+Either way the block saves 160 bytes.
 
 **Only `boilerplate/any_sensor/` builds for an Uno — 1 of the 10 sketches here.**
 Measured 2026-08-30 with `arduino-cli compile --fqbn arduino:avr:uno` on all ten.

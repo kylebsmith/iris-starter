@@ -5,7 +5,7 @@
    it needs NO SENSOR and NO WIRING -- the data is synthetic and fixed, so the
    only thing under test is the library and your board.
 
-   It answers eight questions, and prints PASS or FAIL for each with the number
+   It answers nine questions, and prints PASS or FAIL for each with the number
    it measured. Anything that says FAIL is a real result and worth keeping.
 
      1  does this chip produce the SAME instrument as the laptop, bit for bit
