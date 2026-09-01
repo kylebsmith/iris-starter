@@ -17,6 +17,10 @@ followed them.
 - A USB-C cable **that carries data**. A charge-only cable will look like a
   dead board and cost you an hour. If no port shows up later, suspect the cable
   before anything else.
+- **Processing**, free from processing.org, but only for `iris_scope/` — the
+  sketch that draws the mapping. Every other sketch here needs nothing but the
+  Arduino IDE, and the board prints the same numbers as plain text if you would
+  rather not install it.
 
 ## 1. Get these files, and the Arduino IDE
 
@@ -86,7 +90,8 @@ Hardware CDC and JTAG* used to build without complaint and then the board would
 never appear as a MIDI device, so the second sketch looked broken when it
 wasn't.
 
-Both sketches now refuse to build with either of those wrong, and the error
+The sketches refuse to build with either of those wrong -- seven of the ten
+carry the guard, including both on this page -- and the error
 names the menu item to fix. If you see a red message mentioning USB Mode, that
 is this check doing its job — read it, change the setting, upload again. It is
 the only mistake here the compiler can catch for you, which is why it does.
@@ -135,7 +140,7 @@ to **115200**.
 ## 8. Play it
 
 ```
-tilt, then press BOOT  ->  demo 1 of 3 (target 0)
+tilt, then press BOOT -- or send any key here except R  ->  demo 1 of 3 (target 0)
 ```
 
 1. Tilt the board somewhere. Press **BOOT**. That pose is now `0`.

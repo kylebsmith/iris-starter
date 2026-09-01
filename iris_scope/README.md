@@ -55,7 +55,22 @@ than a fader.
 4. **Put two different answers at the same pose.** The curve goes flat and the
    board tells you why. The network is not broken — you asked for two things at
    once and it gave you the average, which is the only honest answer.
-5. **Switch to SCOPE** and move slowly. You are tracing the mapping.
+5. **Look at SCOPE** while you move slowly. You are tracing the mapping.
+   Both panels are drawn at once, so there is no view to switch to.
+
+## The keys
+
+| Key | What it does |
+|---|---|
+| SPACE | teach the board this pose means the point you last clicked |
+| `d` | delete the last demonstration |
+| `c` | clear all of them and start over |
+| LEFT / RIGHT | step through the serial ports |
+| `s` | save a screenshot next to the sketch |
+
+**If the plot stays empty, press LEFT or RIGHT.** Opening the wrong serial port
+is the most likely first failure of this sketch, and it looks exactly like a
+dead board.
 
 ## Reading it without Processing
 

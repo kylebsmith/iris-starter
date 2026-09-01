@@ -17,13 +17,13 @@ boilerplate/
   bno055_portable/       a real motion sensor, on almost any board
   stemma_bno055/         the same, ESP32 only, and it remembers after a reboot
 iris_tilt/
-  iris_tilt.ino          175 lines of code — learn it, print it
+  iris_tilt.ino          225 lines — learn it, print it
   iris.h                 the library
 iris_instrument/
-  iris_instrument.ino    268 lines — screen, touch, real USB-MIDI
+  iris_instrument.ino    345 lines — screen, touch, real USB-MIDI
   iris.h                 the library (same file)
 display_check/
-  display_check.ino      61 lines — hardware triage, run this if the screen is dead
+  display_check.ino      98 lines — hardware triage, run this if the screen is dead
 i2c_find/                finds which pins your sensor is wired to, and its address
 determinism_check/       proves the same demonstrations give the same instrument
 device_torture/          long-run stability, on the board rather than on a laptop
@@ -35,15 +35,17 @@ Compiler output for each, on the settings in GET-STARTED.md:
 
 | sketch | flash | RAM |
 |---|---|---|
-| `iris_tilt` | 403,707 B (12%) | 46,360 B (14%) |
-| `display_check` | 409,091 B (13%) | 45,520 B (13%) |
-| `iris_instrument` | 423,119 B (13%) | 47,264 B (14%) |
+| `iris_tilt` | 403,867 B (12%) | 46,368 B (14%) |
+| `display_check` | 409,319 B (13%) | 45,520 B (13%) |
+| `iris_instrument` | 423,275 B (13%) | 47,264 B (14%) |
 
 Almost all of that is the Arduino and USB runtime. iris itself is a few
 kilobytes: `iris_tilt`'s whole instrument — weights, demonstrations and all —
-is the 940-byte `memory` array on line 50. (I measured that on the
-ESP32-S3 itself; the same macro gives 1,024 on a 64-bit laptop, because the
-struct pads differently.)
+is the 944-byte `memory` array on line 67. (Measured on the ESP32-S3's own
+compiler as a compile-time assertion, and confirmed by a second 32-bit target;
+the same macro gives 1,032 on a 64-bit laptop, because the struct pads
+differently. Both figures are 8 bytes larger than this paragraph said before
+0.1.0 -- `struct iris` grew by that much and the prose did not follow.)
 
 ---
 
