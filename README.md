@@ -54,7 +54,9 @@ differently. Both figures are 8 bytes larger than this paragraph said before
 Read it top to bottom. It's short on purpose and I want you to follow every
 line.
 
-**It reads the gravity vector off the sensor** over I2C, using the Adafruit
+**It reads the gravity vector off the sensor** over I2C — the two-wire bus
+(inter-integrated circuit) that carries data and clock on two pins, which is
+what the four-wire STEMMA QT cable is — using the Adafruit
 BNO055 library. Gravity, not orientation in degrees — Euler angles wrap from
 +180 to −180, and two poses a degree apart then arrive as opposite ends of the
 range. Nothing smooth can fit that. Gravity points down and never wraps.
@@ -131,7 +133,7 @@ judge a change against:
 - One clone. No submodules, no package manager, no build script to read first.
 - Opens in the Arduino IDE.
 - A wrong board setting produces a **compiler error with a human message**,
-  never a bricked board. *(Met, as of this pass: both sketches check
+  never a bricked board. *(Met, as of this pass: seven of the ten sketches check
   `ARDUINO_USB_MODE` and `ARDUINO_USB_CDC_ON_BOOT` at compile time and stop
   with an error naming the exact menu item. Before that, the wrong USB Mode
   built cleanly and silently removed MIDI.)*

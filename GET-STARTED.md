@@ -203,7 +203,8 @@ more RAM than an Uno has, and `boilerplate/bno055_portable/` says so with a buil
 The rest fail with compiler messages rather than an explanation, which is worth
 knowing before you try one.
 
-`boilerplate/stemma_bno055/` is the same file wired to a real sensor over I2C,
+`boilerplate/stemma_bno055/` is the same file wired to a real sensor over I2C
+(inter-integrated circuit, the two-wire bus the STEMMA QT cable carries),
 if you want to see what filling in those five places actually looks like.
 
 ## Then: the one that makes sound
@@ -267,7 +268,8 @@ charge-only.
 **Serial Monitor is empty.** Baud rate 115200, and check *USB CDC On Boot* is
 Enabled.
 
-**"No BNO055."** The sketch prints every address answering on the I2C bus, so
+**"No BNO055."** The sketch prints every address answering on the two-wire
+I2C bus, so
 you can see whether the sensor is there at all. It tries both 0x28 and 0x29.
 Reseat the STEMMA cable — it clicks when it's seated.
 

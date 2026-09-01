@@ -78,10 +78,12 @@ Everything the board sends is plain text, one item per line, so the Serial
 Monitor is a valid second view:
 
 ```
-R lo hi              the input range
+X lo hi unit         the sensor's full physical scale, and its unit
+R lo hi              the input range you have actually visited
 D index x y0 y1      a demonstration: input x taught to mean (y0, y1)
 C n x a b x a b ...  the curve: n points of (input, out0, out1)
 L x y0 y1            live: where you are right now
+A y0 y1              the board echoing back the target you just clicked
 M text               a message for you
 ```
 
