@@ -35,7 +35,7 @@
    inputs, 16 outputs, 64 hidden units. The 2 / 3 / 16 you are about to read is
    a starting point, not a limit, and on a modern board you are nowhere near
    one. Measured, this same file, unchanged: on an ESP32-S3 it uses 13% of
-   memory and leaves 282,440 bytes free; on an Uno it uses 81% and leaves 371.
+   memory and leaves 281,952 bytes free; on an Uno it uses 81% and leaves 371.
    So if you have the newer board, raising N_INPUTS for a sensor with more axes
    -- or N_DEMOS because you want to teach it a longer piece -- costs you
    nothing you will notice. Raise the three ceilings above with it if you go
