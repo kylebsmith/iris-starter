@@ -210,7 +210,23 @@ static void check_spread(void) {
 static bool training = false;
 
 static void retrain_and_redraw(void) {
-  if (demos < 2) return;
+  if (demos < 2) {
+    /* NOT ENOUGH TO FIT -- BUT SAY SO, because the student just did something.
+       This was a bare `return`. The first demonstration was read, stored and
+       counted, and then announced to nobody: no D marker, so the plot could not
+       draw the dot, and no message, so the serial monitor stayed silent. You
+       pressed SPACE and the machine gave you nothing back, which is the exact
+       thing this sketch exists to stop happening. Measured before the fix: one
+       press produced 192 live-value lines and zero acknowledgements.
+       The delete branch below already handled this same case correctly, three
+       lines apart, which is how the asymmetry was found. */
+    send_range();
+    send_demos();          /* the D that puts the student's dot on the plot */
+    say(demos == 1 ? "got it. Now move the sensor somewhere different and"
+                     " press SPACE again -- two poses makes a curve."
+                   : "no demonstrations yet. Move the sensor and press SPACE.");
+    return;
+  }
   iris_reseed(k, iris_seed(k));
   if (!iris_train_begin(k, 0)) { say("TRAINING REFUSED - nothing to fit"); return; }
   training = true;
