@@ -9,7 +9,8 @@ input value, including the ones you never taught it.
 
 ## What you need
 
-A board and a BNO055 on I²C. Nothing else — no knobs, no buttons, no screen.
+A board and a BNO055 sensor on I²C — the two-wire bus (inter-integrated
+circuit) that the STEMMA QT cable carries. Nothing else — no knobs, no buttons, no screen.
 The sketch searches for the sensor across the pin pairs the common ESP32-S3
 boards use, so you do not have to know which pins yours is on.
 

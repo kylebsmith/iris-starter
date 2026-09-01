@@ -87,11 +87,14 @@ combination on this exact board.
 **The two that bite.** *USB CDC On Boot = Disabled* gives you a board that runs
 fine and cannot talk to you — Serial Monitor stays empty forever. *USB Mode =
 Hardware CDC and JTAG* used to build without complaint and then the board would
-never appear as a MIDI device, so the second sketch looked broken when it
+never appear as a MIDI device — Musical Instrument Digital Interface, the
+standard note-and-controller protocol synthesisers speak — so the second sketch
+looked broken when it
 wasn't.
 
 The sketches refuse to build with either of those wrong -- seven of the ten
-carry the guard, including both on this page -- and the error
+carry at least one guard and six check USB Mode specifically, including every
+sketch on this page -- and the error
 names the menu item to fix. If you see a red message mentioning USB Mode, that
 is this check doing its job — read it, change the setting, upload again. It is
 the only mistake here the compiler can catch for you, which is why it does.

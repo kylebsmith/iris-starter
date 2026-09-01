@@ -21,6 +21,8 @@ iris_tilt/
   iris.h                 the library
 iris_instrument/
   iris_instrument.ino    345 lines — screen, touch, real USB-MIDI
+                         (Musical Instrument Digital Interface: the note and
+                         controller protocol synthesisers speak)
   iris.h                 the library (same file)
 display_check/
   display_check.ino      98 lines — hardware triage, run this if the screen is dead
@@ -44,8 +46,8 @@ kilobytes: `iris_tilt`'s whole instrument — weights, demonstrations and all �
 is the 944-byte `memory` array on line 67. (Measured on the ESP32-S3's own
 compiler as a compile-time assertion, and confirmed by a second 32-bit target;
 the same macro gives 1,032 on a 64-bit laptop, because the struct pads
-differently. Both figures are 8 bytes larger than this paragraph said before
-0.1.0 -- `struct iris` grew by that much and the prose did not follow.)
+differently. The first grew by 4 bytes and the second by 8 since this paragraph was
+written before 0.1.0 -- `struct iris` grew by that much and the prose did not follow.)
 
 ---
 
@@ -133,8 +135,8 @@ judge a change against:
 - One clone. No submodules, no package manager, no build script to read first.
 - Opens in the Arduino IDE.
 - A wrong board setting produces a **compiler error with a human message**,
-  never a bricked board. *(Met, as of this pass: seven of the ten sketches check
-  `ARDUINO_USB_MODE` and `ARDUINO_USB_CDC_ON_BOOT` at compile time and stop
+  never a bricked board. *(Met, as of this pass: six of the ten sketches check
+  `ARDUINO_USB_MODE` and seven check `ARDUINO_USB_CDC_ON_BOOT` at compile time and stop
   with an error naming the exact menu item. Before that, the wrong USB Mode
   built cleanly and silently removed MIDI.)*
 - First sound in under fifteen minutes, from zero prior experience.

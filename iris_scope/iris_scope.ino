@@ -52,6 +52,14 @@
 #if !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools -> USB CDC On Boot -> 'Enabled', or the plot will never receive anything."
 #endif
+/* And the OTHER setting. This sketch checked CDC On Boot and not USB Mode, so
+   a student with USB Mode wrong got a clean build and a silent board -- from
+   the first sketch GET-STARTED.md tells them to run, on the same page that
+   promises the build will refuse. A guard that covers one of the two settings
+   that can produce a dead board is not a guard against a dead board. */
+#if ARDUINO_USB_MODE
+#error "Wrong USB Mode. Set Tools -> USB Mode -> 'USB-OTG (TinyUSB)'. Every sketch in this repo uses that one setting."
+#endif
 #endif
 
 /* ---- the shape of the instrument ---------------------------------------
