@@ -26,7 +26,7 @@ No sensor at all? Set `USE_ANALOG 1` at the top and turn a potentiometer on A0.
 
 Two poses is enough. You now have a curve.
 
-## The two views — press TAB
+## The two views — both on screen at once
 
 **TRANSFER.** Horizontal is your sensor, vertical is what the instrument plays.
 The big green dots are the two things you said. The line through them is what

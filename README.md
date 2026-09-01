@@ -2,13 +2,16 @@
 
 Tilt the board. It learns what you meant. Then it plays.
 
-Three sketches, one header, and a walkthrough. It exists so you can get a
+Ten sketches, one header, and a walkthrough. It exists so you can get a
 trained model running on real hardware in about twenty minutes and see the thing
 work before anyone asks you to understand it.
 
 **Start at [GET-STARTED.md](GET-STARTED.md).**
 
 ```
+iris_scope/
+  iris_scope.ino         run this first — watch the curve the network invents
+  processing/            the plot it talks to, over the USB cable
 boilerplate/
   any_sensor/            any sensor, any board — start here
   bno055_portable/       a real motion sensor, on almost any board
@@ -21,6 +24,9 @@ iris_instrument/
   iris.h                 the library (same file)
 display_check/
   display_check.ino      61 lines — hardware triage, run this if the screen is dead
+i2c_find/                finds which pins your sensor is wired to, and its address
+determinism_check/       proves the same demonstrations give the same instrument
+device_torture/          long-run stability, on the board rather than on a laptop
 GET-STARTED.md           install, board settings, first flash, and the traps
 TASKS.md                 what to pick up
 ```
@@ -146,3 +152,9 @@ running it and looking.
 So when something you generate compiles, that's the beginning of knowing whether
 it's right, not the end. Run it. Tilt the board. Does it do what you said it
 would? Same standard whether a person or a model wrote the line.
+
+## Licence
+
+BSD 3-Clause — see [LICENSE](LICENSE). The copies of `iris.h` vendored into each
+sketch folder are the same file under the same terms, kept in step by `sync-iris.sh`.
+Use, change and redistribute the sketches freely; that is what they are for.

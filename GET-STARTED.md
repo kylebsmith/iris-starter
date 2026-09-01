@@ -111,7 +111,7 @@ the curve the network invented between them. There is a Processing sketch in
 `iris_scope/processing/` that draws it, and the board also prints the numbers as
 plain text if you would rather read them.
 
-Two views, TAB to swap. TRANSFER shows what it plays against what you did.
+Both views are on screen at once. TRANSFER shows what it plays against what you did.
 SCOPE plots the two outputs against each other like an oscilloscope, which is
 where the nonlinearity becomes a shape you can see.
 
