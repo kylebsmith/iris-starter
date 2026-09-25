@@ -1,13 +1,16 @@
 /* WHERE IS MY SENSOR?
    ===================
-   Every ESP32 board puts I2C on different pins, and a STEMMA QT cable plugged
+   Every ESP32 board puts I2C (inter-integrated circuit, the two-wire bus
+   sensors talk on) on different pins, and a STEMMA QT cable plugged
    into a board whose pins you guessed wrong looks exactly like a broken sensor:
    silence, no error, and a reading of zero that trains and plays perfectly
    happily. This sketch finds the sensor instead of guessing.
 
    It tries the board's own default pins first, then every pin pair that the
    common ESP32-S3 boards use, and prints every I2C address that answers on
-   each. Then it tells you which line to paste into your sketch.
+   each, naming the pins as SDA (the data line) and SCL (the clock line) by
+   their GPIO numbers (GPIO: general-purpose input/output, a numbered pin of
+   the chip). Then it tells you which line to paste into your sketch.
 
    Known addresses it will name for you:
      0x28 / 0x29   BNO055 orientation      0x1C / 0x1E  LIS3MDL magnetometer
@@ -20,11 +23,13 @@
    ========================================================================= */
 #include <Wire.h>
 
-/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
-   USB port, as on the ES3C28P, Serial reaches the computer only with USB
-   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
-   so every other board builds untouched. Either USB Mode works: this sketch
-   uses no feature of the TinyUSB mode. */
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB (Universal Serial Bus)
+   socket is the chip's own USB port, as on the ES3C28P, Serial reaches the
+   computer only with USB CDC On Boot enabled (CDC, Communications Device
+   Class, is the USB standard for a serial port). ARDUINO_USB_MODE exists only
+   on chips with that port, so every other board builds untouched. Either USB
+   Mode works: this sketch uses nothing from the USB-OTG (On-The-Go) mode's
+   TinyUSB software. */
 #if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
@@ -42,7 +47,7 @@ static const Pair PAIRS[] = {
   {  1,  2, "ESP32-S3 alternate" },
   { 41, 40, "Adafruit QT Py ESP32-S3" },
   { 42, 41, "ESP32-S3 alternate" },
-  { 17, 18, "ESP32 classic default" },
+  { 17, 18, "ESP32-S3 alternate" },
   { 21, 22, "ESP32 classic default" },
   {  7,  6, "ESP32-S3 alternate" },
   { 11, 12, "ESP32-S3 alternate" },

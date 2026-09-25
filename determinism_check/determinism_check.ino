@@ -24,10 +24,10 @@
 #endif
 
 /* NO FUSED MULTIPLY-ADD IN THIS FILE. The demonstrations below are computed
-   here, and 0.25f + 0.5f * u is a multiply and an add, which GCC fuses into
-   one instruction by default, rounding once instead of twice. A fused result
-   can differ in the last bit, and then the chip trains on different numbers
-   from the laptop. iris.h switches fusing off for its own code only; this
+   here, and 0.25f + 0.5f * u is a multiply and an add, which GCC (the
+   compiler the ESP32 board package uses) fuses into one instruction by
+   default, rounding once instead of twice. A fused result can differ in the
+   last bit, and then the chip trains on different numbers from the laptop. iris.h switches fusing off for its own code only; this
    switches it off for the rest of this file, so the recipe stays comparable
    whatever you change in it. */
 #if defined(__GNUC__) && !defined(__clang__)
@@ -44,11 +44,13 @@
 #define HOST_FILE_HASH       0xD8666A69u
 #define HOST_FILE_BYTES      872u
 
-/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
-   USB port, as on the ES3C28P, Serial reaches the computer only with USB
-   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
-   so every other board builds untouched. Either USB Mode works: this sketch
-   uses no feature of the TinyUSB mode. */
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB (Universal Serial Bus)
+   socket is the chip's own USB port, as on the ES3C28P, Serial reaches the
+   computer only with USB CDC On Boot enabled (CDC, Communications Device
+   Class, is the USB standard for a serial port). ARDUINO_USB_MODE exists only
+   on chips with that port, so every other board builds untouched. Either USB
+   Mode works: this sketch uses nothing from the USB-OTG (On-The-Go) mode's
+   TinyUSB software. */
 #if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif

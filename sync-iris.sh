@@ -9,9 +9,8 @@ SRC=${IRIS_SRC:-../iris/iris.h}
 [ -f "$SRC" ] || { echo "cannot find the library at $SRC"; echo "set IRIS_SRC to point at iris.h"; exit 2; }
 want=$(md5 -q "$SRC" 2>/dev/null || md5sum "$SRC" | cut -d' ' -f1)
 bad=0
-# find(1), not a glob. `*/iris.h` only reaches one level down, so the copies
-# under boilerplate/ were silently outside the guard -- a drift check that does
-# not cover every copy is not a drift check.
+# find(1), not a glob: `*/iris.h` reaches one level down, and the copies under
+# boilerplate/ are two levels down. A drift check has to cover every copy.
 for f in $(find . -name iris.h -not -path './.git/*' | sort); do
   got=$(md5 -q "$f" 2>/dev/null || md5sum "$f" | cut -d' ' -f1)
   if [ "$got" = "$want" ]; then

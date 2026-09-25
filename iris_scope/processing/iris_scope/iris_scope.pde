@@ -28,12 +28,11 @@
 
    WHY IT LOOKS LIKE THIS
      Every action has a visible effect, immediately (Victor, "Learnable
-     Programming", 2012). The horizontal axis never rescales, because a
-     silently rescaling axis makes values unreadable even when animated (Heer &
-     Robertson, IEEE InfoVis 2007); the part of the range you have visited is
-     drawn as a band instead. The two panels are shown together rather than
-     swapped, because correspondence has to be seen, not remembered (Becker &
-     Cleveland, Technometrics 1987).
+     Programming", 2012). The horizontal axis never rescales, so a value keeps
+     its place on the screen for the whole session; the part of the range you
+     have visited is drawn as a band instead. The two panels are shown
+     together rather than swapped, because correspondence has to be seen, not
+     remembered (Becker & Cleveland, Technometrics 1987).
    ========================================================================= */
 
 import processing.serial.*;

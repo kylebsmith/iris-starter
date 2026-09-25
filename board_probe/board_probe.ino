@@ -32,7 +32,8 @@
    starting "R," -- R,section,name,value,unit -- so a log can be searched.
    Run it twice on each board and keep the whole log.
 
-   BOARD SETTINGS: as in GET-STARTED.md. It builds in either USB Mode.
+   BOARD SETTINGS: as in GET-STARTED.md. It builds in either USB (Universal
+   Serial Bus) Mode.
    ========================================================================= */
 #include "iris.h"
 #if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
@@ -40,10 +41,11 @@
 #endif
 
 /* NO FUSED MULTIPLY-ADD IN THIS FILE. Section 1 computes the pinned recipes'
-   demonstrations here, and GCC fuses a multiply and an add into one
-   instruction by default, which rounds once instead of twice and can move
-   the last bit. iris.h switches fusing off for its own code only; this
-   switches it off for the rest of this file, as the laptop's tests do. */
+   demonstrations here, and GCC (the compiler the ESP32 board package uses)
+   fuses a multiply and an add into one instruction by default, which rounds
+   once instead of twice and can move the last bit. iris.h switches fusing
+   off for its own code only; this switches it off for the rest of this
+   file, as the laptop's tests do. */
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize ("fp-contract=off")
 #elif defined(__clang__)
@@ -52,8 +54,9 @@
 
 /* BOARD SETTINGS. board_probe times the ESP32-S3 with its cycle counter, so
    it needs the ESP32-S3 board entry; Serial reaches the computer through the
-   chip's own USB port only with USB CDC On Boot enabled. Either USB Mode
-   works: this sketch uses no feature of the TinyUSB mode. */
+   chip's own USB port only with USB CDC On Boot enabled (CDC: Communications
+   Device Class, the USB serial-port standard). Either USB Mode works: this
+   sketch uses nothing from the USB-OTG mode's TinyUSB software. */
 #if !defined(ARDUINO_ARCH_ESP32) || !defined(CONFIG_IDF_TARGET_ESP32S3)
 #error "board_probe times an ESP32-S3 with its cycle counter. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module, then set the board options in GET-STARTED.md."
 #endif

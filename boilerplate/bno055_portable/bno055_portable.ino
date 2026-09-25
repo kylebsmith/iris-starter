@@ -7,31 +7,35 @@
    boilerplate/stemma_bno055 is the same instrument with more in it -- it saves
    what you taught it to flash, so the instrument survives a reboot -- but
    Preferences.h and Wire.begin(SDA, SCL) are Espressif calls, so that file
-   builds on an ESP32 and nowhere else. This one uses neither. Measured
-   compiling on a Raspberry Pi Pico (68,896 bytes) and an ESP32-S3, and
-   refusing an Uno below with an explanation instead of a compiler error.
+   builds on an ESP32 and nowhere else. This one uses neither. It compiles
+   for a Raspberry Pi Pico (both Arduino cores for it) and the ESP32-S3, and
+   refuses an Uno below with an explanation instead of a compiler error.
    ========================================================================= */
 #include <Wire.h>
 #include <Adafruit_BNO055.h>
-/* NOT FOR AN 8-BIT AVR. The Adafruit BNO055 driver plus this sketch's globals
-   leave about 80 bytes of stack on an Uno, and training needs roughly 200. It
-   would compile, flash, and then corrupt memory the first time you pressed
-   record -- silently, which is the worst way for it to fail. If you are on an
-   Uno use boilerplate/any_sensor: the same instrument, and it shrinks to fit.
-   Delete these four lines if you know what you are doing and have measured it. */
+/* NOT FOR AN 8-BIT AVR (the Uno's chip family). The Adafruit BNO055 driver
+   plus this sketch's globals leave 79 bytes of stack on an Uno, and the
+   training step's frame alone is 284 (iris.h, the note above IRIS_MAX_IN).
+   It would compile, flash, and then corrupt memory the first time you
+   pressed record -- silently, which is the worst way for it to fail. If you
+   are on an Uno use boilerplate/any_sensor: the same instrument, and it
+   shrinks to fit. Delete these three lines if you know what you are doing
+   and have measured it. */
 #if defined(__AVR__)
-#error "bno055_portable.ino needs more RAM than an AVR has. Use boilerplate/any_sensor on an Uno."
+#error "bno055_portable.ino needs more memory than an AVR board has. Use boilerplate/any_sensor on an Uno."
 #endif
 #include "iris.h"
 #if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
-   USB port, as on the ES3C28P, Serial reaches the computer only with USB
-   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
-   so every other board builds untouched. Either USB Mode works: this sketch
-   uses no feature of the TinyUSB mode. */
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB (Universal Serial Bus)
+   socket is the chip's own USB port, as on the ES3C28P, Serial reaches the
+   computer only with USB CDC On Boot enabled (CDC, Communications Device
+   Class, is the USB standard for a serial port). ARDUINO_USB_MODE exists only
+   on chips with that port, so every other board builds untouched. Either USB
+   Mode works: this sketch uses nothing from the USB-OTG (On-The-Go) mode's
+   TinyUSB software. */
 #if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
@@ -75,12 +79,12 @@ static int demos = 0;
 void setup() {
   Serial.begin(115200);
   Wire.begin();
-  /* bno.begin() returns false when the sensor is not answering. Ignoring it
-     was the worst bug in this file: with the cable out, every reading is a
-     clean 0.0, every demonstration records the same input, training succeeds,
-     the status stays 0, and the instrument plays one frozen number for ever.
-     Nothing anywhere says the sensor is missing. Stop instead. */
-  /* Try the other address before giving up. The ADR pad on the back of the
+  /* bno.begin() returns false when the sensor is not answering. Carry on
+     regardless and, with the cable out, every reading is a clean 0.0, every
+     demonstration records the same input, training succeeds, the status stays
+     0, and the instrument plays one frozen number for ever. Nothing anywhere
+     says the sensor is missing. Stop instead. */
+  /* Try the other address before giving up. The ADR (address-select) pad on the back of the
      Adafruit board moves it from 0x28 to 0x29, boards ship both ways, and the
      failure message below names both -- so it has to actually try both, or it
      sends someone to reseat a cable that was never the problem. */
@@ -142,12 +146,9 @@ void loop() {
                          "Check the wiring."));
     }
     else {
-      /* SAY SO ON EVERY SUCCESSFUL RECORD, not only on failure. This used to
-         print nothing at all when the first save worked -- ++demos made it 1,
-         the >= 2 test was false, and the board went silent. So a FAILED save
-         was loud and a SUCCESSFUL one was invisible, which is backwards, and it
-         taught a student on their very first press that the button does
-         nothing. Every other sketch here prints a count; this one did not. */
+      /* SAY SO ON EVERY SUCCESSFUL RECORD, not only on failure. A first
+         press that prints nothing teaches a student that the button does
+         nothing, so a successful save is as loud as a failed one. */
       ++demos;
       Serial.print(F("saved. demonstrations: ")); Serial.println(demos);
       if (demos >= 2) start_training();
