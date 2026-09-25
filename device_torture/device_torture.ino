@@ -1,21 +1,26 @@
 /* ON-DEVICE TORTURE TEST
    ======================
-   Everything about this library has been proved on a laptop. A laptop is not
-   the machine it is for. This sketch proves it on the chip in your hand, and
+   The library's tests run on a laptop. A laptop is not the machine it is
+   for. This sketch runs the same kind of checks on the chip in your hand, and
    it needs NO SENSOR and NO WIRING -- the data is synthetic and fixed, so the
    only thing under test is the library and your board.
 
-   It answers nine questions, and prints PASS or FAIL for each with the number
-   it measured. Anything that says FAIL is a real result and worth keeping.
+   It asks nine questions. The yes-or-no ones print PASS or FAIL with the
+   number measured; the rest print a labelled figure. Anything that says FAIL
+   is a real result and worth keeping. On a board that is not an ESP32 the
+   tests that need its flash, heap counter or task stack print SKIP and count
+   as neither.
 
      1  does this chip produce the SAME instrument as the laptop, bit for bit
-     2  does the library allocate memory behind your back
+     2  how much does the heap move across init, train and predict (a figure)
      3  does a saved instrument survive a real write to real flash
      4  does a CORRUPTED file actually get refused, on this hardware
-     5  how long does training really take, at four different sizes
+     5  how long does iris_train take on this recipe, at four sizes (figures)
      6  how much stack is left at the deepest point
      7  do predictions drift over tens of thousands of calls
      8  do several instruments running at once stay independent
+     9  the mean time of one prediction, loop overhead included (a figure;
+        board_probe measures one call properly)
 
    BOARD SETTINGS: as in GET-STARTED.md.
    RUNTIME: about a minute. Open Serial Monitor at 115200 and wait for DONE.
@@ -23,6 +28,20 @@
 #include "iris.h"
 #if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#endif
+
+/* NO FUSED MULTIPLY-ADD IN THIS FILE. Test 1's demonstrations are computed
+   here, and 1.0f - (float)i * 0.03f is a multiply and a subtract, which GCC
+   fuses into one instruction by default, rounding once instead of twice. The
+   fused inputs differ in the last bit, so the chip would train on different
+   numbers from the laptop and test 1 would fail for a reason that has
+   nothing to do with the library (measured on a laptop with GCC: 0x60E31823
+   instead of 0xB7FC47A0). iris.h switches fusing off for its own code only;
+   this switches it off for the rest of this file. */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize ("fp-contract=off")
+#elif defined(__clang__)
+#pragma STDC FP_CONTRACT OFF
 #endif
 
 #ifdef ARDUINO_ARCH_ESP32
@@ -36,11 +55,10 @@
 static Preferences store;
 #endif
 
-/* The value this exact recipe produces on a laptop. Measured across 13 builds
-   -- cc and clang, -O0 -O1 -O2 -O3 -Os, and g++/clang++ at -std=gnu++17, which
-   is what Arduino compiles this file as -- and identical in every one. If the
-   chip disagrees, that is a real finding about the chip or its compiler, not a
-   broken test. Keep the output and tell someone. */
+/* The value this exact recipe produces on a laptop with iris 0.2.0, pinned in
+   the library's tests/starter_recipes.c. If the chip disagrees, that is a
+   real finding about the chip or its compiler, not a broken test. Keep the
+   output and tell someone. */
 #define HOST_HASH 0xB7FC47A0u
 
 #define NI 2
@@ -52,6 +70,8 @@ static unsigned char arena[IRIS_ARENA(NI, NH, NO, CAP)];
 static unsigned char blob[IRIS_ARENA(NI, NH, NO, CAP)];   /* always >= save size */
 static int passed = 0, failed = 0;
 
+static int skipped = 0;
+
 static void result(const char *name, int ok, const char *detail) {
   Serial.print(ok ? F("  PASS  ") : F("  FAIL  "));
   Serial.print(name);
@@ -59,6 +79,16 @@ static void result(const char *name, int ok, const char *detail) {
   Serial.println(detail);
   if (ok) passed++; else failed++;
 }
+
+#ifndef ARDUINO_ARCH_ESP32
+static void skip(const char *name, const char *why) {
+  Serial.print(F("  SKIP  "));
+  Serial.print(name);
+  for (int i = (int)strlen(name); i < 34; ++i) Serial.print(' ');
+  Serial.println(why);
+  skipped++;
+}
+#endif
 
 static void hex8(uint32_t v, char *out) {
   for (int i = 0; i < 8; ++i) {
@@ -68,7 +98,11 @@ static void hex8(uint32_t v, char *out) {
   out[8] = 0;
 }
 
-/* The same fixed recipe the desktop test runs. Nothing here may vary. */
+/* The same fixed recipe the laptop test runs: 20 demonstrations, then exactly
+   800 training passes continuing from the starting weights iris_init drew.
+   iris_continue is the fixed-length trainer; iris_train would stop wherever
+   the error levels off, which is not the pinned recipe. Nothing here may
+   vary. */
 static iris *build(void) {
   iris *k = iris_init(arena, sizeof arena, NI, NH, NO, CAP, 1234u);
   if (!k) return 0;
@@ -81,7 +115,7 @@ static iris *build(void) {
     out[2] = (float)((i * 5) % 7)  / 7.0f;
     iris_record(k, in, out);
   }
-  iris_train_epochs(k, 800);
+  iris_continue(k, 800);
   return k;
 }
 
@@ -104,11 +138,8 @@ static uint32_t hash_predictions(iris *k) {
 void setup(void) {
   Serial.begin(115200);
   /* WAIT FOR THE PORT, do not guess at it with a delay. On a board with native
-     USB the serial device does not exist until the host opens it, and anything
-     printed before that is gone for ever. A fixed delay(1500) is a bet that the
-     human clicked fast enough -- this is the trap GET-STARTED.md warns about,
-     and the first version of this very sketch fell into it and printed its
-     whole report into a port nobody was listening to. */
+     USB the serial device does not exist until the computer opens it, and
+     anything printed before that is gone for ever. */
   while (!Serial && millis() < 20000) delay(10);
   delay(200);
 }
@@ -123,7 +154,8 @@ void loop(void) {
     delay(10000);
     Serial.print(F("  [still here] "));
     Serial.print(passed); Serial.print(F(" passed, "));
-    Serial.print(failed); Serial.println(F(" failed -- press RESET to run again."));
+    Serial.print(failed); Serial.print(F(" failed, "));
+    Serial.print(skipped); Serial.println(F(" skipped -- press RESET to run again."));
     return;
   }
   done = 1;
@@ -138,11 +170,8 @@ void loop(void) {
   char buf[64], hx[9];
 
   /* ---- 1. determinism ---------------------------------------------------- */
-  /* The heap is sampled with NOTHING between the two reads but library calls.
-     An earlier version sampled at the top of loop() and compared after a batch
-     of Serial.print, and reported "heap moved -24 bytes" -- which was the USB
-     stack's own churn, not iris. A test that cries wolf about the thing it is
-     guarding is worse than no test. */
+  /* The heap is sampled with NOTHING between the two reads but library calls,
+     so printing and the USB stack's own allocations stay out of test 2. */
 #ifdef ARDUINO_ARCH_ESP32
   uint32_t heap_before = ESP.getFreeHeap();
 #endif
@@ -160,21 +189,18 @@ void loop(void) {
   /* ---- 2. does it allocate ----------------------------------------------- */
 #ifdef ARDUINO_ARCH_ESP32
   { long d = (long)heap_before - (long)heap_after;
-    /* REPORTED, NOT JUDGED -- and that is the honest form of this test.
-       This board runs an operating system and a USB stack that allocate on
-       their own schedule, so a heap delta measured across any span of wall
-       clock is measuring THEM, not this library. Two earlier versions of this
-       check failed on -24 bytes and the library was innocent both times.
-       The real proof is the symbol table and it is definitive: build the
-       library freestanding and no allocator symbol appears at all, so it
-       cannot allocate whatever the heap does. `sh build.sh target` checks
-       that on this chip's own compiler, and CI checks it on every push. */
+    /* REPORTED, NOT JUDGED. This board runs an operating system and a USB
+       stack that allocate on their own schedule, so a heap delta measured
+       across any span of time measures them as well as this library. The
+       proof that iris never allocates is its symbol table: built
+       freestanding, it references no allocator at all (the library's
+       tests/freestanding.sh checks that with this chip's own compiler). */
     Serial.print(F("  ----  2 heap delta across init+train+predict  "));
     Serial.print(d); Serial.println(F(" bytes (the OS's, not ours --"));
     Serial.println(F("        the no-allocation proof is the symbol table,"));
     Serial.println(F("        checked by sh build.sh target)")); }
 #else
-  result("2 no hidden allocation", 1, "skipped -- needs ESP32 heap counter");
+  skip("2 heap delta", "needs the ESP32 heap counter");
 #endif
 
   /* ---- 3. save / load through REAL flash ---------------------------------- */
@@ -194,7 +220,7 @@ void loop(void) {
     store.end();
   } else result("3 survives a real power cycle", 0, "iris_save returned 0");
 #else
-  result("3 survives a real power cycle", 1, "skipped -- needs ESP32 flash");
+  skip("3 survives a real power cycle", "needs the ESP32 flash store");
 #endif
 
   /* ---- 4. corruption is refused, ON THIS HARDWARE ------------------------- */
@@ -214,7 +240,9 @@ void loop(void) {
 
   /* ---- 5. what training actually costs ------------------------------------ */
   Serial.println();
-  Serial.println(F("  5 training cost on this chip, measured:"));
+  Serial.println(F("  5 iris_train time on this chip, on this sketch's recipe"));
+  Serial.println(F("    (inputs that move together: not representative data --"));
+  Serial.println(F("    board_probe times training on representative data):"));
   { const int sizes[] = { 4, 8, 14, 20 };
     for (unsigned s = 0; s < sizeof sizes / sizeof *sizes; ++s) {
       static unsigned char a3[IRIS_ARENA(NI, NH, NO, CAP)];
@@ -240,7 +268,7 @@ void loop(void) {
     snprintf(buf, sizeof buf, "%u bytes never used", (unsigned)hw);
     result("6 stack headroom remaining", hw > 512, buf); }
 #else
-  result("6 stack headroom remaining", 1, "skipped -- needs FreeRTOS");
+  skip("6 stack headroom remaining", "needs the ESP32's task stack counter");
 #endif
 
   /* ---- 7. does it drift over a long run ----------------------------------- */
@@ -269,7 +297,7 @@ void loop(void) {
         float out[NO] = { (float)j / 3.0f, (float)i / 8.0f, 0.25f };
         iris_record(set[j], in, out);
       }
-      iris_train_epochs(set[j], 400);
+      iris_train(set[j]);
     }
     for (int j = 0; j < 3; ++j) want[j] = hash_predictions(set[j]);
     for (long round = 0; round < 2000; ++round)      /* interleave them hard */
@@ -283,11 +311,12 @@ void loop(void) {
            same ? "3 instruments, 6,000 interleaved, no cross-talk"
                 : "AN INSTRUMENT CHANGED"); }
 
-  /* ---- 9. what ONE prediction actually costs ------------------------------
-     README.md quotes a per-prediction figure against a 20.8 us audio sample
-     budget. That number decides whether this library can sit in an audio
-     callback at all, so it has to be measured on the chip and not scaled from
-     a laptop. `sink` is volatile so the compiler cannot delete the work. */
+  /* ---- 9. the mean time of one prediction, loop overhead included --------
+     20,000 calls timed with micros(), divided by 20,000. The figure includes
+     the loop, the input update and the volatile store, and it is a mean, not
+     a worst case. board_probe measures one call with the cycle counter, the
+     empty loop subtracted, and prints percentiles. `sink` is volatile so the
+     compiler cannot delete the work. */
   { static volatile float sink = 0.0f;
     const long N = 20000;
     float in[NI] = { 0.37f, 0.61f }, out[NO];
@@ -301,13 +330,13 @@ void loop(void) {
     uint32_t us = micros() - t0;
     float each = (float)us / (float)N;
     Serial.println();
-    Serial.print(F("  9 one prediction costs           "));
+    Serial.print(F("  9 mean per prediction, loop overhead included   "));
     Serial.print(each, 3);
     Serial.print(F(" us   (")); Serial.print(N); Serial.print(F(" calls in "));
     Serial.print(us); Serial.println(F(" us)"));
-    Serial.print(F("      audio sample budget at 48 kHz is 20.8 us -- that is "));
-    Serial.print(20.8f / each, 2);        /* NOT (int): 1.39 printed as 1 */
-    Serial.println(F("x headroom."));
+    Serial.print(F("      one audio sample at 48 kHz lasts 20.8 us; this mean is "));
+    Serial.print(each / 20.8f * 100.0f, 1);
+    Serial.println(F("% of it."));
     Serial.println(); }
 
   /* ---- verdict ------------------------------------------------------------ */
@@ -315,8 +344,9 @@ void loop(void) {
   Serial.println(F("=================================================================="));
   Serial.print(F("  "));
   Serial.print(passed); Serial.print(F(" passed, "));
-  Serial.print(failed); Serial.println(F(" failed"));
-  if (!failed) Serial.println(F("  This library works on this chip. DONE."));
+  Serial.print(failed); Serial.print(F(" failed, "));
+  Serial.print(skipped); Serial.println(F(" skipped"));
+  if (!failed) Serial.println(F("  Every test that ran passed on this chip. DONE."));
   else         Serial.println(F("  Something above is real. Keep the output. DONE."));
   Serial.println(F("=================================================================="));
 }

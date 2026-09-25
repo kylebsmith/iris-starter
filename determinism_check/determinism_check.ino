@@ -1,17 +1,20 @@
 /* ON-DEVICE DETERMINISM CHECK
    ===========================
    The library's central promise is that the same seed and the same
-   demonstrations produce the same instrument -- so a mapping you save today
-   plays the same in ten years. That promise has been verified on a laptop
-   across nine compiler and optimisation settings.
+   demonstrations produce the same instrument, bit for bit, so a mapping you
+   save today plays the same on another board and in ten years.
 
-   It has NEVER been verified on the chip it is actually for. The README says
-   so. This sketch is how that stops being true.
+   This sketch runs one fixed recipe, hashes what the trained instrument
+   plays and the file it saves, and compares both numbers with the values a
+   laptop computes for the same recipe. It prints PASS when the chip matches
+   the laptop and FAIL when it does not. A FAIL is a real finding about the
+   chip or its compiler: keep the whole printout.
 
-   It runs the same fixed recipe the desktop test runs, hashes every weight,
-   and prints the result. If the number below matches the host's, the promise
-   holds on this hardware. If it does not, it does not, and we would rather
-   know.
+   THE RECIPE: iris_init with seed 1234, 20 fixed demonstrations, then
+   iris_reseed(k, 1234) and iris_continue(k, 800) -- exactly 800 training
+   passes from the seed's starting weights. (iris_train would stop wherever
+   the error levels off; a fixed count keeps the recipe identical to the one
+   the library's own test, tests/starter_recipes.c, pins.)
 
    BOARD SETTINGS: as in GET-STARTED.md. No sensor needed -- the data is fixed.
    ========================================================================= */
@@ -19,6 +22,27 @@
 #if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
+
+/* NO FUSED MULTIPLY-ADD IN THIS FILE. The demonstrations below are computed
+   here, and 0.25f + 0.5f * u is a multiply and an add, which GCC fuses into
+   one instruction by default, rounding once instead of twice. A fused result
+   can differ in the last bit, and then the chip trains on different numbers
+   from the laptop. iris.h switches fusing off for its own code only; this
+   switches it off for the rest of this file, so the recipe stays comparable
+   whatever you change in it. */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize ("fp-contract=off")
+#elif defined(__clang__)
+#pragma STDC FP_CONTRACT OFF
+#endif
+
+/* THE LAPTOP'S VALUES for this recipe with iris 0.2.0. PREDICTION_HASH is
+   pinned in the library's tests/starter_recipes.c. FILE_HASH is the same
+   recipe's saved file (format 7, 872 bytes), computed by a laptop build of
+   this sketch. */
+#define HOST_PREDICTION_HASH 0x203834EDu
+#define HOST_FILE_HASH       0xD8666A69u
+#define HOST_FILE_BYTES      872u
 
 /* The two settings that make Serial Monitor stay empty for ever. This is the
    sketch you were sent to when nothing else worked, so it is the last one that
@@ -62,11 +86,20 @@ static uint32_t g_hash, g_file_hash, g_ms; static size_t g_n; static int g_ok;
    drops them, and a hash printed as 0x203834ED on one board and 0x3834ED
    on another looks like a determinism failure when it is a printing one. */
 static void print_hex8(uint32_t v) {
+  Serial.print(F("0x"));
   for (int i = 28; i >= 0; i -= 4) {
     int d = (int)((v >> i) & 0xF);
     Serial.print((char)(d < 10 ? '0' + d : 'A' + d - 10));
   }
+}
+
+/* One labelled line: PASS or FAIL, what it measured, what the laptop got. */
+static int check(const __FlashStringHelper *name, uint32_t got, uint32_t want) {
+  Serial.print(got == want ? F("  PASS  ") : F("  FAIL  "));
+  Serial.print(name); print_hex8(got);
+  Serial.print(F("   laptop ")); print_hex8(want);
   Serial.println();
+  return got == want;
 }
 
 void setup() {
@@ -85,7 +118,8 @@ void setup() {
   }
 
   uint32_t t0 = millis();
-  iris_retrain_new(k, 1234, 800);          /* fixed seed, fixed epoch count */
+  iris_reseed(k, 1234);                    /* the seed's starting weights */
+  iris_continue(k, 800);                   /* exactly 800 passes from them */
   uint32_t ms = millis() - t0;
 
   /* Hash every prediction over a fixed grid: this is the instrument's
@@ -106,25 +140,23 @@ void setup() {
   g_hash = h; g_file_hash = fnv1a(file, n); g_ms = ms; g_n = n; g_ok = 1;
 }
 
-/* Print from loop(), not setup(). A result printed before anyone opens the
-   serial port is a result nobody sees -- which is how the first run of this
-   sketch reported nothing at all. */
+/* Print from loop(), not setup(), and repeat every few seconds: a result
+   printed before anyone opens the serial port is a result nobody sees. */
 void loop() {
-  if (!g_ok) { Serial.println("iris_init refused"); delay(2000); return; }
+  if (!g_ok) { Serial.println(F("iris_init refused")); delay(2000); return; }
   Serial.println();
-  Serial.println("=== iris on-device determinism check ===");
-  /* Serial.print, not Serial.printf: printf on Serial is an Espressif
-     extension and does not exist on AVR, SAMD or RP2040. This sketch exists
-     to compare a hash on YOUR board against the one on a laptop, so it is
-     the last sketch in the repository that should refuse to build. */
+  Serial.println(F("=== iris on-device determinism check ==="));
+  /* Serial.print, not Serial.printf: printf on Serial exists only on
+     Espressif boards, and this sketch is meant to build on any board. */
   Serial.print(F("  library version   ")); Serial.println(IRIS_VERSION_STRING);
-  Serial.println(F("  training          800 epochs, 20 demonstrations, seed 1234"));
-  Serial.print(F("  took              ")); Serial.print(g_ms); Serial.println(F(" ms"));
-  Serial.print(F("  saved file        ")); Serial.print((unsigned)g_n); Serial.println(F(" bytes"));
-  Serial.print(F("  PREDICTION HASH   0x")); print_hex8(g_hash);
-  Serial.print(F("  saved-bytes hash  0x")); print_hex8(g_file_hash);
-  Serial.println();
-  Serial.println("  Compare PREDICTION HASH against the same recipe on a host.");
-  Serial.println("  Equal means the promise holds on this chip.");
+  Serial.println(F("  recipe            seed 1234, 20 demonstrations, iris_reseed + iris_continue 800"));
+  Serial.print(F("  training took     ")); Serial.print(g_ms); Serial.println(F(" ms"));
+  Serial.print(F("  saved file        ")); Serial.print((unsigned)g_n);
+  Serial.print(F(" bytes   laptop ")); Serial.println(HOST_FILE_BYTES);
+  int ok = check(F("prediction hash   "), g_hash, HOST_PREDICTION_HASH);
+  ok &= check(F("saved-bytes hash  "), g_file_hash, HOST_FILE_HASH);
+  ok &= (g_n == HOST_FILE_BYTES);
+  Serial.println(ok ? F("  RESULT: PASS -- this chip builds the same instrument as the laptop, bit for bit.")
+                    : F("  RESULT: FAIL -- this chip differs from the laptop. Keep this printout."));
   delay(3000);
 }
