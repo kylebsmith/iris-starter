@@ -589,8 +589,12 @@
 
    With the same compiler and flags iris_internal_train_run, the deepest
    frame on the record/train/predict path, falls from 284 bytes to 124, a
-   saving of 160, and iris_predict from 158 to 46; a caller into which the
-   compiler inlines that whole path measures 280 and 120. These are
+   saving of 160, and iris_predict from 158 to 46. Inlined into its caller
+   the path measures a little differently: in a sketch-like file that
+   records, trains and predicts, built with -ffunction-sections, iris_train
+   (which takes the training run inline) measures 280 bytes and 120 as GNU C
+   (-std=gnu11), and as C99 main takes the whole path and measures 290 and
+   130. These are
    single frames as the compiler reports them, not a measured run-time
    stack depth. The only rule is that the maxima must be at least the n_in,
    n_out and n_hid you pass to iris_init, which iris_init checks.
@@ -1141,9 +1145,9 @@ struct iris {
      ends, which is the only way a plateau-stopped bar can be truthful. */
   int32_t tr_done, tr_ceiling, tr_running;
   int32_t tr_n_ex;         /* how many demonstrations the shuffle covers,
-                              or -1 once a record or a delete has edited the
-                              store under a sliced run (see the change test
-                              in iris_internal_train_run) */
+                              or -1 once a record has edited the store under
+                              a sliced run (see the change test in
+                              iris_internal_train_run) */
   float   tr_ref;          /* error one plateau-window ago */
   float   tr_err;          /* the last epoch's error, added up while the
                               weights moved: what the error floor and the
@@ -1735,7 +1739,6 @@ IRIS_API int iris_delete_index(iris *k, int idx) { if (!k) return 0;
   k->ex_res[k->n_ex - 1] = 0.0f;
   k->n_ex--;
   k->trained = 0;
-  if (k->tr_running) k->tr_n_ex = -1;   /* a sliced run must re-read the store */
   return 1;
 }
 
@@ -2541,13 +2544,14 @@ IRIS_API float iris_internal_train_run(iris *k, int epochs, int conv, int resume
     iris_internal_begin_session(k, epochs);
   } else if (k->tr_n_ex != k->n_ex) {
     /* The data changed under a running slice -- a record or a delete between
-       two calls. Each of them sets tr_n_ex to -1 while a run is going, which
-       matches no count, so an edit that leaves the count as it was is seen
-       too: delete a bad take and record its replacement, the repair this
-       library teaches, and the count is the same while the data is not. The
-       shuffle covers a fixed count, so the permutation no longer describes
-       the data: rebuild it, or the new demonstration is never visited and a
-       deleted one still is.
+       two calls. A delete alone changes the count. iris_record sets tr_n_ex
+       to -1 while a run is going, which matches no count, so an edit that
+       leaves the count as it was, which must include a record, is seen too:
+       delete a bad take and record its replacement, the repair this library
+       teaches, and the count is the same while the data is not. The shuffle
+       covers a fixed count, so the permutation no longer describes the data:
+       rebuild it, or the new demonstration is never visited and a deleted
+       one still is.
 
        Also restart the plateau window. The stopping test asks whether the
        error fell since last window, and new data makes the error JUMP UP, so
