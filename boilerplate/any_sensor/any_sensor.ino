@@ -13,11 +13,12 @@
    and the ESP32-S3.
    ========================================================================= */
 /* ON A SMALL BOARD THE WORKING ARRAYS ARE THE STACK BUDGET.
-   iris.h sizes nine internal arrays from these maxima rather than from the
-   shape you asked for, so on an Uno the default 32/16/64 reserves 192 bytes of
-   stack for an instrument that uses 20. Measured with avr-gcc 7.3.0 -Os
-   -fstack-usage: the deepest frame goes from 308 bytes to 148 when they are
-   shrunk to fit -- a saving of 160. An Uno leaves
+   iris.h sizes its working arrays from these maxima rather than from the
+   shape you asked for, so with the defaults (32 inputs, 16 outputs, 64
+   hidden units) the training step alone reserves 192 bytes of stack for an
+   instrument whose reading and target need 20. Shrunk to fit, the deepest
+   frame on the record, train and predict path is 160 bytes smaller; iris.h
+   gives the avr-gcc figures in its note above IRIS_MAX_IN. An Uno leaves
    only a few hundred bytes of stack, so this is the difference between
    training and quietly running off the end of it.
    They must be at least as large as N_INPUTS, N_OUTPUTS and the hidden width
@@ -29,7 +30,8 @@
 #define IRIS_MAX_HID 12
 #endif
 /* AND THE OPPOSITE, IF YOUR BOARD IS A MODERN ONE. None of the four lines
-   above happen unless you are compiling for an 8-bit AVR, so on an ESP32, a
+   above happen unless you are compiling for an 8-bit AVR (the chip family of
+   the Uno and the Nano Every), so on an ESP32, a
    Pico, an STM32 or a Teensy the library's own ceilings apply instead: 32
    inputs, 16 outputs, 64 hidden units. The 2 / 3 / 16 you are about to read is
    a starting point, not a limit, and on a modern board you are nowhere near
@@ -44,11 +46,13 @@
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
-   USB port, as on the ES3C28P, Serial reaches the computer only with USB
-   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
-   so every other board builds untouched. Either USB Mode works: this sketch
-   uses no feature of the TinyUSB mode. */
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB (Universal Serial Bus)
+   socket is the chip's own USB port, as on the ES3C28P, Serial reaches the
+   computer only with USB CDC On Boot enabled (CDC, Communications Device
+   Class, is the USB standard for a serial port). ARDUINO_USB_MODE exists only
+   on chips with that port, so every other board builds untouched. Either USB
+   Mode works: this sketch uses nothing from the USB-OTG (On-The-Go) mode's
+   TinyUSB software. */
 #if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
@@ -59,22 +63,22 @@
    N_OUTPUTS is how many things you want to control.
    N_DEMOS   is how many demonstrations it can hold before it is full.
 
-   If you change these, the compiler will stop you if you forget to update
-   places 2 and 3 below. That is deliberate: a mismatch used to compile
-   cleanly and then feed the model uninitialised memory for ever. */
+   If you change N_OUTPUTS, the compiler stops you until POT_PIN below has
+   that many entries. Places 2 and 3 are checked when the sketch starts: if
+   read_sensor or read_target fills too few slots or too many, it halts with
+   a message saying which, rather than training on memory nobody wrote. */
 #define N_INPUTS   2
 #define N_OUTPUTS  3
 #define N_DEMOS   16
 
 #define SAVE_BTN 0          /* the BOOT button on most boards */
 /* An ESP32's analogue inputs are 12-bit and read up to 4095. Almost everything
-   else in the Arduino world is 10-bit and reads up to 1023. This used to be a
-   flat 4095 with a comment telling you to change it, which meant the sketch
-   written to run anywhere had one board's number baked into it: on an Uno the
-   knobs reached a quarter of their travel and read_target handed send_sound
-   0.0 to 0.25, while FILL THIS IN 4 promised 0.0 to 1.0. It still trained --
-   iris fits its output range to what you demonstrate -- so nothing announced
-   the problem. Ask the compiler instead. */
+   else in the Arduino world is 10-bit and reads up to 1023. Divide by the
+   wrong one and the knobs reach only part of their travel -- on an Uno,
+   dividing by 4095 gives read_target 0.0 to 0.25 where FILL THIS IN 4
+   promises 0.0 to 1.0 -- and nothing announces it, because iris fits its
+   output range to what you demonstrate and trains anyway. So the compiler
+   picks the number for the board. */
 #if defined(ARDUINO_ARCH_ESP32)
 #define ADC_MAX  4095.0f
 #else
@@ -110,8 +114,10 @@ static void read_sensor(float *in) {
    When you press SAVE, this decides what sound you are demonstrating. Knobs
    here, because they need no screen -- but iris never sees your interface. It
    takes N_OUTPUTS numbers between 0 and 1 and does not care where they came
-   from: a rotary encoder, faders, a touchscreen, an incoming MIDI message, a
-   line typed into the serial monitor. Replace the body, keep the shape. */
+   from: a rotary encoder, faders, a touchscreen, an incoming MIDI message
+   (MIDI, Musical Instrument Digital Interface, is the message format
+   synthesisers understand), a line typed into the serial monitor. Replace
+   the body, keep the shape. */
 static void read_target(float *out) {
   for (int i = 0; i < N_OUTPUTS; ++i)
     out[i] = analogRead(POT_PIN[i]) / ADC_MAX;   /* <<< YOUR INTERFACE HERE */
@@ -171,25 +177,22 @@ void setup() {
   /* Do read_sensor and read_target really fill every slot? The compiler cannot
      check that, so check it here, once, loudly. Without it a forgotten line
      means uninitialised memory is recorded as a demonstration and played back
-     as sound, and nothing ever says so -- an independent review found that to
-     be the single largest silent-failure family in this sketch, 2,140 cases of
-     2,140, every one of them an under-filling read_target.
+     as sound, and nothing ever says so.
 
-     The probe arrays are deliberately OVERSIZED. An earlier version sized them
-     exactly, so lowering a count while leaving an extra line in the function
-     wrote past the end of the very array written to catch that mistake. The
-     slack means the overrun lands in spare space we own and is then reported
+     The probe arrays are deliberately OVERSIZED. Lower a count and leave an
+     extra line in the function, and an exactly sized array would be written
+     past its end by the very check meant to catch that mistake. The slack
+     means the overrun lands in spare space we own and is then reported
      rather than corrupting the stack. */
   { float probe[N_INPUTS + 4], tprobe[N_OUTPUTS + 4];
     int in_unset[N_INPUTS + 4], t_unset[N_OUTPUTS + 4];
     int i, pass;
 
     /* TWO sentinels, not one. With a single magic number, a sensor that
-       legitimately returns exactly that value is accused of never setting an
-       input it sets on every call -- a review found 210 such false
-       accusations. A slot is only genuinely unwritten if it still holds
-       sentinel A after a pass seeded with A *and* sentinel B after a pass
-       seeded with B. No real reading is equal to both. */
+       legitimately returns exactly that value would be accused of never
+       setting an input it sets on every call. A slot is only genuinely
+       unwritten if it still holds sentinel A after a pass seeded with A *and*
+       sentinel B after a pass seeded with B. No real reading is equal to both. */
     for (i = 0; i < N_INPUTS  + 4; ++i) in_unset[i] = 1;
     for (i = 0; i < N_OUTPUTS + 4; ++i) t_unset[i]  = 1;
     for (pass = 0; pass < 2; ++pass) {
@@ -229,7 +232,8 @@ void setup() {
 
   /* ---- IS THE SENSOR ACTUALLY THERE? ------------------------------------
      This is the most common hardware fault there is, and the hardest to see.
-     A disconnected I2C sensor does not report an error and does not return a
+     A disconnected I2C sensor (I2C, inter-integrated circuit, is the two-wire
+     bus most sensor boards use) does not report an error and does not return a
      not-a-number: the Adafruit drivers hand back a clean 0.0, or the last
      value, or a rated maximum. Every one of those is a perfectly valid float.
      It records, it trains, it plays -- one frozen note, for ever, with the
@@ -342,11 +346,12 @@ void loop() {
         if (iris_count(k) >= 2) {
           Serial.flush();
           start_training();
-        }
+        } else training = false;         /* one left: nothing to fit or play */
       } else Serial.println(F("nothing to delete."));
     }
     else if (c == 'c') {
-      iris_clear(k);
+      iris_clear(k);                     /* this also ends a run in progress */
+      training = false;
       Serial.println(F("cleared. start demonstrating again."));
     }
   }

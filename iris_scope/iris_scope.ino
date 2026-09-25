@@ -35,11 +35,14 @@
      A y0 y1              the board received the target you clicked
      M text               a message for the human
 
-   HARDWARE: a board and a BNO055 on I2C. Nothing else -- no knobs, no
-   buttons, no screen. If you have no sensor at all, set USE_ANALOG to 1 and
-   it reads a potentiometer on ANALOG_PIN instead: GPIO 2 on the ES3C28P's
-   expansion socket (CHECK ON THE BOARD, see PARTS.md), A0 on other boards.
-   Everything below that is identical.
+   HARDWARE: a board and a BNO055 on I2C (inter-integrated circuit, the
+   two-wire bus the sensor talks on: SDA is its data line, SCL its clock;
+   PARTS.md shows the wiring). Nothing
+   else -- no knobs, no buttons, no screen. If you have no sensor at all, set
+   USE_ANALOG to 1 and it reads a potentiometer on ANALOG_PIN instead: GPIO 2
+   (GPIO: general-purpose input/output, a numbered pin of the chip) on the
+   ES3C28P's expansion socket (CHECK ON THE BOARD, see PARTS.md), A0 on other
+   boards. Everything below that is identical.
 
    WHAT IT LISTENS FOR
      SPACE     teach it: this pose means the point you last clicked
@@ -55,6 +58,14 @@
 #define ANALOG_PIN A0
 #endif
 
+/* Small board: shrink the library's working arrays. This has to come before
+   iris.h is included to take effect; see the note above IRIS_MAX_IN there. */
+#if defined(__AVR__)
+#define IRIS_MAX_IN  4
+#define IRIS_MAX_OUT 4
+#define IRIS_MAX_HID 12
+#endif
+
 #include <Wire.h>
 #if !USE_ANALOG
 #include <Adafruit_BNO055.h>
@@ -64,11 +75,13 @@
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
-   USB port, as on the ES3C28P, Serial reaches the computer only with USB
-   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
-   so every other board builds untouched. Either USB Mode works: this sketch
-   uses no feature of the TinyUSB mode. */
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB (Universal Serial Bus)
+   socket is the chip's own USB port, as on the ES3C28P, Serial reaches the
+   computer only with USB CDC On Boot enabled (CDC, Communications Device
+   Class, is the USB standard for a serial port). ARDUINO_USB_MODE exists only
+   on chips with that port, so every other board builds untouched. Either USB
+   Mode works: this sketch uses nothing from the USB-OTG (On-The-Go) mode's
+   TinyUSB software. */
 #if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
@@ -85,12 +98,6 @@
 #define N_HID  12
 #define N_DEMOS 12
 #define CURVE_POINTS 96      /* how finely we sample the curve for drawing */
-
-#if defined(__AVR__)         /* small board: shrink the working arrays. See iris.h. */
-#define IRIS_MAX_IN  4
-#define IRIS_MAX_OUT 4
-#define IRIS_MAX_HID 12
-#endif
 
 static unsigned char memory[IRIS_ARENA(N_IN, N_HID, N_OUT, N_DEMOS)];
 static iris *k;
@@ -121,12 +128,9 @@ static float read_input(void) {
 
 /* ---- WHAT YOU ARE TEACHING IT TO SAY ------------------------------------
    The target comes from the Processing window: you click where you want this
-   pose to land, and it sends "T y0 y1". No knobs, no extra wiring.
-
-   An earlier version read two potentiometers on A1 and A2. With nothing wired
-   those pins float, so every demonstration taught a random pair of numbers and
-   the picture was noise -- a demo whose first impression depends on hardware
-   the student was not told to buy is not a first demo. */
+   pose to land, and it sends "T y0 y1". No knobs, no extra wiring: an
+   unwired analogue pin floats, and a target read from one would teach the
+   network noise. */
 static float target0 = 0.5f, target1 = 0.5f;
 
 /* Read one line like "T 0.31 0.88" that has already had its 'T' consumed. */
@@ -175,11 +179,11 @@ static void send_demos(void) {
 static void send_curve(void) {
   if (demos < 2) return;
 
-  /* If the sensor has barely moved there is no range to sweep, and an earlier
-     version simply sent nothing -- leaving a blank window and no reason for
-     it. Widen a degenerate range so there is always something to draw, and say
-     plainly that the poses were too close together, which is the real problem
-     and the same one iris_tilt warns about. */
+  /* If the sensor has barely moved there is no range to sweep, and sending
+     nothing would leave a blank window with no reason given. Widen a
+     degenerate range so there is always something to draw, and say plainly
+     that the poses were too close together, which is the real problem and the
+     same one iris_tilt warns about. */
   float lo = seen_lo, hi = seen_hi;
   if (!(hi > lo) || (hi - lo) < 0.05f) {
     float mid = (hi > lo) ? (lo + hi) * 0.5f : lo;
@@ -221,25 +225,20 @@ static void check_spread(void) {
 }
 
 /* TRAINING IN SLICES, so the plot keeps updating while it learns.
-   iris_train() would block for up to three seconds on this board and the live
-   dot would freeze -- in a sketch whose whole purpose is watching the mapping
-   form, that is the worst possible moment to stop drawing. iris_train_begin +
-   iris_train_slice do the identical fit in pieces: verified bit-identical at
-   4, 12 and 20 demonstrations, including with a prediction between every
-   slice, which is exactly what happens below. */
+   iris_train() blocks for seconds on this board at eight or more
+   demonstrations (device_torture test 5 times it), and the live dot would
+   freeze -- in a sketch whose whole purpose is watching the mapping form,
+   that is the worst possible moment to stop drawing. iris_train_begin +
+   iris_train_slice do the identical fit in pieces, bit for bit, with a
+   prediction between slices or not; the library's tests/train.c checks it. */
 static bool training = false;
 
 static void retrain_and_redraw(void) {
   if (demos < 2) {
     /* NOT ENOUGH TO FIT -- BUT SAY SO, because the student just did something.
-       This was a bare `return`. The first demonstration was read, stored and
-       counted, and then announced to nobody: no D marker, so the plot could not
-       draw the dot, and no message, so the serial monitor stayed silent. You
-       pressed SPACE and the machine gave you nothing back, which is the exact
-       thing this sketch exists to stop happening. Measured before the fix: one
-       press produced 192 live-value lines and zero acknowledgements.
-       The delete branch below already handled this same case correctly, three
-       lines apart, which is how the asymmetry was found. */
+       Send the D line that puts the dot on the plot and a message for the
+       serial monitor: a press of SPACE that gives nothing back teaches that
+       the button does nothing. */
     send_range();
     send_demos();          /* the D that puts the student's dot on the plot */
     say(demos == 1 ? "got it. Now move the sensor somewhere different and"
@@ -278,9 +277,8 @@ void setup(void) {
 #if !USE_ANALOG
   /* FIND THE SENSOR, DO NOT ASSUME IT. Every board puts I2C somewhere else,
      and a plain Wire.begin() picks that board's default -- which on the Adafruit
-     Feather boards is NOT where the STEMMA QT connector is. Written the naive
-     way first, this sketch reported "no sensor" on a board with a perfectly
-     good sensor sitting on pins 16 and 15. So: try the default, then the pin
+     Feather boards is NOT where the STEMMA QT connector is, and on the ES3C28P
+     is not its I2C socket (pins 16 and 15). So: try the default, then the pin
      pairs the common ESP32-S3 boards actually use, and try both addresses on
      each. Whatever answers first wins, and we say which so you can hardcode it
      later if you want to. */
@@ -290,9 +288,8 @@ void setup(void) {
     for (unsigned i = 0; i < sizeof PINS / sizeof PINS[0] && !found; ++i) {
       /* Only the ESP32 core lets you choose I2C pins or tells you whether the
          bus came up: on AVR and RP2040, Wire.begin() returns void and takes no
-         arguments. Guarding this is what keeps this sketch -- the FIRST thing a
-         student runs -- buildable on a Pico and an Uno. Written the ESP32 way
-         first, it compiled only there, which is the wrong sketch to lose. */
+         arguments. The guard keeps this sketch building on a Pico (an Uno has
+         too little memory for it). */
 #if defined(ARDUINO_ARCH_ESP32)
       Wire.end(); delay(10);
       if (PINS[i][0] < 0) { if (!Wire.begin()) continue; }
@@ -324,12 +321,10 @@ void setup(void) {
   if (!k) { say("iris_init refused - check the shape at the top"); for (;;) delay(1000); }
 
   /* THE SENSOR'S PHYSICAL FULL SCALE, sent once. The plot draws its horizontal
-     axis against THIS and never rescales, because a silently rescaling axis is
-     the thing that made the picture unreadable -- and rescaling is known to
-     degrade value judgements even when it is animated (Heer & Robertson 2007).
-     The range actually visited is drawn as a band inside it instead, which
-     turns an invisible transformation into a visible, meaningful object: it is
-     the part of the range the network has any evidence about. */
+     axis against THIS and never rescales, so a value keeps its place on the
+     screen for the whole session. The range actually visited is drawn as a
+     band inside it instead: it is the part of the range the network has any
+     evidence about. */
 #if USE_ANALOG
 #if defined(ARDUINO_ARCH_ESP32)
   Serial.println(F("X 0 4095 counts"));
@@ -346,9 +341,9 @@ void setup(void) {
 
 void loop(void) {
   float x = read_input();
-  /* Tell the plot when the visited range grows, rate-limited. It used to be
-     sent only after training, so between demonstrations the plot's idea of the
-     range was stale and it drew the live marker outside its own axes. */
+  /* Tell the plot when the visited range grows, rate-limited, so between
+     demonstrations its idea of the range stays current and the live marker
+     stays inside its axes. */
   { static uint32_t last_range = 0;
     bool grew = false;
     if (x < seen_lo) { seen_lo = x; grew = true; }
@@ -382,11 +377,15 @@ void loop(void) {
         say("deleted the last demonstration");
         send_demos();                                /* the dot goes now */
         if (demos >= 2) retrain_and_redraw();
-        else { send_range(); Serial.println(F("C 0")); say("need two to draw a curve"); }
+        else {
+          training = false;                          /* nothing left to fit */
+          send_range(); Serial.println(F("C 0")); say("need two to draw a curve");
+        }
       } else say("nothing to delete");
     }
     else if (c == 'c') {
-      iris_clear(k); demos = 0;
+      iris_clear(k); demos = 0;                     /* also ends a run in progress */
+      training = false;
       seen_lo = 1e30f; seen_hi = -1e30f;
       say("cleared");
     }
@@ -396,14 +395,11 @@ void loop(void) {
 
   /* The live dot, about 30 times a second. Only the dot -- the curve is only
      resent when the mapping actually changes, so the link stays quiet. */
-  /* THE LIVE LINE GOES OUT FROM POWER-ON, TRAINED OR NOT.
-     This used to sit inside `if (demos >= 2)`, so the board said nothing at all
-     until the second demonstration existed. A student waving the sensor in
-     their first thirty seconds saw a dead window, clicked and saw nothing,
-     pressed SPACE and saw nothing -- six actions before any evidence the system
-     was alive. By then they have learned that their input does not matter, and
-     no amount of curve afterwards repairs that. Three tokens when untrained,
-     five when trained; the plot reads both. */
+  /* THE LIVE LINE GOES OUT FROM POWER-ON, TRAINED OR NOT. A student waving
+     the sensor in the first thirty seconds sees the marker move before any
+     demonstration exists, which is the evidence that the system is alive and
+     their input matters. Two tokens before there are two demonstrations,
+     four after; the plot reads both. */
   { float out[N_OUT];
     Serial.print(F("L ")); Serial.print(x, 4);
     if (demos >= 2) {
