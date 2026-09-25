@@ -38,6 +38,9 @@
 #include <USBMIDI.h>
 #include "esp32-hal-tinyusb.h"
 #include "iris.h"
+#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
+#error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#endif
 
 /* The two board settings that fail SILENTLY if you get them wrong: the wrong
    USB Mode compiles fine and then the board simply never appears as a MIDI

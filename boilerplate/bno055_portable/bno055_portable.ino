@@ -23,6 +23,9 @@
 #error "bno055_portable.ino needs more RAM than an AVR has. Use boilerplate/any_sensor on an Uno."
 #endif
 #include "iris.h"
+#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
+#error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#endif
 
 #define SAVE_BTN 0                 /* BOOT button */
 #define POT_A 4

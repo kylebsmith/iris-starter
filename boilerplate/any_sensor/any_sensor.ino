@@ -41,6 +41,9 @@
    nothing you will notice. Raise the three ceilings above with it if you go
    past 4 in, 4 out or 12 hidden; iris_init refuses rather than truncating. */
 #include "iris.h"
+#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
+#error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#endif
 
 /* ---- FILL THIS IN 1: HOW BIG IS YOUR INSTRUMENT? ------------------------
    N_INPUTS  is how many numbers your sensor gives you at once. An

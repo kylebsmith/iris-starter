@@ -42,6 +42,9 @@
 #include <Adafruit_BNO055.h>
 #include "esp32-hal-tinyusb.h"
 #include "iris.h"
+#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
+#error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#endif
 
 /* Both of these settings fail silently when wrong: CDC off gives a board that
    runs and cannot talk to you, and the wrong USB Mode leaves the 'R' escape

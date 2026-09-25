@@ -16,6 +16,9 @@
    BOARD SETTINGS: as in GET-STARTED.md. No sensor needed -- the data is fixed.
    ========================================================================= */
 #include "iris.h"
+#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
+#error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#endif
 
 /* The two settings that make Serial Monitor stay empty for ever. This is the
    sketch you were sent to when nothing else worked, so it is the last one that
