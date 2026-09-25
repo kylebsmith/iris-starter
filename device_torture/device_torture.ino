@@ -32,11 +32,11 @@
 
 /* NO FUSED MULTIPLY-ADD IN THIS FILE. Test 1's demonstrations are computed
    here, and 1.0f - (float)i * 0.03f is a multiply and a subtract, which GCC
-   fuses into one instruction by default, rounding once instead of twice. The
-   fused inputs differ in the last bit, so the chip would train on different
-   numbers from the laptop and test 1 would fail for a reason that has
-   nothing to do with the library (measured on a laptop with GCC: 0x60E31823
-   instead of 0xB7FC47A0). iris.h switches fusing off for its own code only;
+   (the compiler the ESP32 board package uses) fuses into one instruction by
+   default, rounding once instead of twice. The fused inputs differ in the
+   last bit, so the chip would train on different numbers from the laptop
+   and test 1 would fail for a reason that has nothing to do with the library
+   (measured on a laptop with GCC: 0x60E31823 instead of 0xB7FC47A0). iris.h switches fusing off for its own code only;
    this switches it off for the rest of this file. */
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize ("fp-contract=off")
@@ -44,11 +44,13 @@
 #pragma STDC FP_CONTRACT OFF
 #endif
 
-/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
-   USB port, as on the ES3C28P, Serial reaches the computer only with USB
-   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
-   so every other board builds untouched. Either USB Mode works: this sketch
-   uses no feature of the TinyUSB mode. */
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB (Universal Serial Bus)
+   socket is the chip's own USB port, as on the ES3C28P, Serial reaches the
+   computer only with USB CDC On Boot enabled (CDC, Communications Device
+   Class, is the USB standard for a serial port). ARDUINO_USB_MODE exists only
+   on chips with that port, so every other board builds untouched. Either USB
+   Mode works: this sketch uses nothing from the USB-OTG (On-The-Go) mode's
+   TinyUSB software. */
 #if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
@@ -122,7 +124,7 @@ static iris *build(void) {
 }
 
 static uint32_t hash_predictions(iris *k) {
-  uint32_t h = 2166136261u;                       /* FNV-1a over the raw bytes */
+  uint32_t h = 2166136261u;                       /* FNV-1a (Fowler-Noll-Vo) over the raw bytes */
   for (int i = 0; i <= 20; ++i) {
     float in[NI], out[NO];
     in[0] = (float)i * 0.05f;
@@ -198,9 +200,9 @@ void loop(void) {
        freestanding, it references no allocator at all (the library's
        tests/freestanding.sh checks that with this chip's own compiler). */
     Serial.print(F("  ----  2 heap delta across init+train+predict  "));
-    Serial.print(d); Serial.println(F(" bytes (the OS's, not ours --"));
+    Serial.print(d); Serial.println(F(" bytes (the operating system's, not ours --"));
     Serial.println(F("        the no-allocation proof is the symbol table,"));
-    Serial.println(F("        checked by sh build.sh target)")); }
+    Serial.println(F("        checked by the library's tests/freestanding.sh)")); }
 #else
   skip("2 heap delta", "needs the ESP32 heap counter");
 #endif
@@ -218,11 +220,11 @@ void loop(void) {
     int ok = r && got == n && iris_load(r, blob, got) && hash_predictions(r) == h;
     snprintf(buf, sizeof buf, "%u bytes through flash, hash %s", (unsigned)n,
              ok ? "identical" : "CHANGED");
-    result("3 survives a real power cycle", ok, buf);
+    result("3 survives real flash", ok, buf);
     store.end();
-  } else result("3 survives a real power cycle", 0, "iris_save returned 0");
+  } else result("3 survives real flash", 0, "iris_save returned 0");
 #else
-  skip("3 survives a real power cycle", "needs the ESP32 flash store");
+  skip("3 survives real flash", "needs the ESP32 flash store");
 #endif
 
   /* ---- 4. corruption is refused, ON THIS HARDWARE ------------------------- */
