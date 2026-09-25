@@ -6,14 +6,32 @@ downloading.
 
 Work top to bottom. If something doesn't match what you see on screen, that's
 worth telling me — these instructions are only as good as the last person who
-followed them.
+followed them. When something goes wrong, [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+lists each symptom, its likely cause and what to do.
+
+The order of this page is the order to run the sketches in:
+
+1. `i2c_find` — is the sensor wired right?
+2. `iris_tilt` — the first instrument: tilt, teach three poses, play
+3. `iris_scope` — see the mapping the network invents, drawn as a curve
+4. `iris_instrument` — the same learning with a screen and USB MIDI sound
+5. `boilerplate/stemma_bno055` — an instrument that survives a power cycle
+
+`boilerplate/any_sensor` is the starting point on any other board.
+`display_check`, `determinism_check`, `device_torture` and `board_probe` are
+checks you run when you need them (the end of this page says when).
 
 ---
 
 ## What you need
 
-- The ES3C28P board (ESP32-S3 with a 240×320 screen)
-- An Adafruit BNO055 orientation sensor and a STEMMA QT cable
+[PARTS.md](PARTS.md) lists every part with its part number, where to buy it,
+and what connects to what. In short:
+
+- The ES3C28P board: an ESP32-S3 (Espressif's microcontroller, the chip that
+  runs your sketch) with a 240×320 touch screen
+- An Adafruit BNO055 orientation sensor (part 4646), the lead that ships with
+  the board, and an Adafruit 4209 cable to join them
 - A USB-C cable **that carries data**. A charge-only cable will look like a
   dead board and cost you an hour. If no port shows up later, suspect the cable
   before anything else.
@@ -30,7 +48,8 @@ folder with `iris_tilt/`, `iris_instrument/` and this page inside it. If you use
 git, `git clone` the same URL instead — it makes no difference to anything
 below.
 
-Then install Arduino IDE 2.x from arduino.cc.
+Then install Arduino IDE 2.x (IDE: integrated development environment, the
+program you write and upload sketches with) from arduino.cc.
 
 ## 2. Add the ESP32 boards
 
@@ -55,78 +74,80 @@ Then **Tools → Board → Boards Manager**, search `esp32`, install
 - **Adafruit GFX Library**
 - **Adafruit ILI9341**
 
-When it offers to install dependencies too, say yes — that's Adafruit BusIO and
-Adafruit Unified Sensor. Five libraries in total; you only ask for three.
+When it offers to install dependencies too, say yes. You ask for three and
+nine arrive: those three, plus Adafruit BusIO, Adafruit Unified Sensor,
+Adafruit SH110X, Adafruit STMPE610, Adafruit TouchScreen and Adafruit TSC2007,
+which the ILI9341 library lists as its dependencies. The sketches use only the
+first five.
 
-> **You do not install iris.** `iris.h` is sitting in the sketch folder and
-> Arduino picks up headers next to a sketch automatically.
+> **You do not install iris.** `iris.h`, the library itself, is copied into
+> every sketch folder that uses it, and Arduino picks up headers next to a
+> sketch automatically. Every copy is iris **0.2.0**, from
+> https://github.com/kylebsmith/iris, and every sketch checks at compile time
+> that its copy is iris 0.2: a different version stops the build with a
+> message saying which file to copy.
 >
-> This is worth a second of your attention, because it's the point of the whole
-> project. The Adafruit libraries are drivers — they talk to a specific screen
-> and a specific sensor, and if one of them breaks you swap it for another and
-> your instrument plays exactly as it did before. The code that decides *how
-> your gesture becomes sound* is the part that must never move under you, and
-> that part has no dependencies at all. One file, one compiler, no install step
-> that can fail in three years.
+> The Adafruit libraries are drivers — they talk to a specific screen and a
+> specific sensor, and if one of them breaks you swap it for another and your
+> instrument plays exactly as it did before. The code that decides *how your
+> gesture becomes sound* is the part that must never move under you, and that
+> part has no dependencies at all.
 
 ## 4. Board settings
 
-**Tools → Board → esp32 → ESP32S3 Dev Module**, then set every one of these:
+**Tools → Board → esp32 → ESP32S3 Dev Module**, then set these:
 
-| Setting | Value |
-|---|---|
-| USB Mode | **USB-OTG (TinyUSB)** |
-| USB CDC On Boot | **Enabled** |
-| Flash Size | **16MB (128Mb)** |
-| PSRAM | **OPI PSRAM** |
-| Partition Scheme | **16M Flash (3MB APP/9.9MB FATFS)** |
+| Setting | Value | What it is |
+|---|---|---|
+| USB Mode | **USB-OTG (TinyUSB)** | USB is Universal Serial Bus. USB-OTG (On-The-Go) is the chip's full USB controller, driven by TinyUSB, an open-source USB software stack; it is what lets the board appear as a MIDI instrument. The other choice, **Hardware CDC and JTAG**, is the chip's fixed serial-and-debug port (CDC: Communications Device Class, the USB standard for a serial port; JTAG: Joint Test Action Group, a debugging interface). |
+| USB CDC On Boot | **Enabled** | Makes the board's USB socket the serial port Serial Monitor reads. |
+| Flash Size | **16MB (128Mb)** | The board's flash memory chip: 16 megabytes. |
+| PSRAM | **OPI PSRAM** | PSRAM (pseudo-static RAM) is the board's extra memory chip; OPI (octal peripheral interface) is the 8-wire link to it. |
+| Partition Scheme | **16M Flash (3MB APP/9.9MB FATFS)** | How the flash is divided: 3 MB for your sketch (the app), 9.9 MB for files (FATFS: a FAT file system). |
 
-These are not defaults and they are not optional. I verified this exact
-combination on this exact board.
+This combination is the one tested on this board. **Only the first two
+change whether a sketch works;** the other three match the board's memory and
+leave room to grow.
 
-**The two that bite.** *USB CDC On Boot = Disabled* gives you a board that runs
-fine and cannot talk to you — Serial Monitor stays empty forever. *USB Mode =
-Hardware CDC and JTAG* used to build without complaint and then the board would
-never appear as a MIDI device — Musical Instrument Digital Interface, the
-standard note-and-controller protocol synthesisers speak — so the second sketch
-looked broken when it
-wasn't.
+*USB CDC On Boot = Disabled* gives you a board that runs fine and cannot talk
+to you — Serial Monitor stays empty. Every sketch refuses to build with it
+off, and the error names the menu item to fix.
 
-The sketches refuse to build with either of those wrong -- seven of the ten
-carry at least one guard and six check USB Mode specifically, including every
-sketch in the walkthrough above -- and the error
-names the menu item to fix. If you see a red message mentioning USB Mode, that
-is this check doing its job — read it, change the setting, upload again. It is
-the only mistake here the compiler can catch for you, which is why it does.
+*USB Mode* matters only to `iris_instrument`, which appears to the computer as
+a USB MIDI instrument (MIDI: Musical Instrument Digital Interface, the message
+format synthesisers understand) and needs USB-OTG (TinyUSB); it refuses to
+build in the other mode. Every other sketch also builds in Hardware CDC and
+JTAG mode, the board's default, but that mode is not yet tested on this board,
+so stay with the table.
 
-## 5. Plug the sensor in
+The sketches written for this board also refuse to build if **Tools → Board**
+is anything but ESP32S3 Dev Module. If you see a red message starting `Set
+Tools ->`, read it, change the setting, upload again.
 
-Connect the BNO055 to the board with the STEMMA QT cable — the little
-four-pin connector, one end into the sensor, the other into the matching socket
-on the board. It clicks when it is properly seated, and a cable that looks
-seated but isn't is the single most common reason for "No BNO055."
+## 5. Connect the sensor
 
-There is nothing to solder and no wires to get the right way round; the
-connector only fits one way. If you are wiring by hand instead, the data line
-is pin 16 and the clock is pin 15.
+The board's I2C socket (I2C, inter-integrated circuit: the two-wire bus that
+carries data and clock on two pins) is **1.25 mm** pitch. The sensor's STEMMA
+QT socket is **1.0 mm**, so a STEMMA QT cable does not fit the board.
+[PARTS.md](PARTS.md) shows the join without soldering: the board's own lead
+into the board, Adafruit's 4209 cable into the sensor, and 4209's four pins
+into the lead by signal — 3.3 V, ground, data (SDA) to GPIO 16, clock (SCL) to
+GPIO 15 (GPIO: general-purpose input/output, a numbered pin of the chip).
+Check which of the lead's wires is which against the board's silkscreen before
+you power up.
 
-## Before the sketches: see the mathematics
+## 6. Check the wiring: `i2c_find`
 
-If you want to understand what this library is doing rather than only use it,
-run **`iris_scope/`** first. It needs the same board and the same sensor, and
-instead of making a sound it draws the mapping: your demonstrations as dots, and
-the curve the network invented between them. There is a Processing sketch in
-`iris_scope/processing/` that draws it, and the board also prints the numbers as
-plain text if you would rather read them.
+**File → Open**, open `i2c_find/i2c_find.ino`. Plug the board in, pick the port
+that appeared in **Tools → Port**, press **Upload** (the arrow), then open
+**Tools → Serial Monitor** at **115200** baud (the serial speed).
 
-Both views are on screen at once. TRANSFER shows what it plays against what you did.
-SCOPE plots the two outputs against each other like an oscilloscope, which is
-where the nonlinearity becomes a shape you can see.
+It lists every device answering on every likely pin pair. On SDA 16 / SCL 15
+you should see **0x28** (or 0x29), the BNO055, next to **0x18** and **0x38**,
+the board's own audio codec and touch controller. If only those two answer,
+the sensor is not connected: it says so. Fix that before going on.
 
-The rest of this page is the sound route. Come back here when the picture stops
-surprising you.
-
-## 6. Open the first sketch
+## 7. The first sketch: `iris_tilt`
 
 **File → Open**, navigate to `iris_tilt/` and open **`iris_tilt.ino`**.
 
@@ -134,13 +155,7 @@ Open the `.ino` file itself, or the folder that has the same name as it —
 Arduino requires a sketch folder and its main file to share a name, so opening
 this repo's top-level folder will not work.
 
-## 7. Flash it
-
-Plug the board in. **Tools → Port** and pick the one that appeared. Press
-**Upload** (the arrow). Then **Tools → Serial Monitor**, and set the baud rate
-to **115200**.
-
-## 8. Play it
+Upload it and open Serial Monitor at 115200, as in step 6.
 
 ```
 tilt, then press BOOT -- or send any key here except R  ->  demo 1 of 3 (target 0)
@@ -153,11 +168,11 @@ tilt, then press BOOT -- or send any key here except R  ->  demo 1 of 3 (target 
 Can't reach BOOT? Type a character into Serial Monitor and hit send — that
 records too, and `c` clears.
 
-**One exception: a capital `R` reboots the board into flashing mode** rather
-than recording, because that is the escape hatch described at the bottom of this
-page. If your board goes quiet and the port disappears after you typed
-something, that is what happened — nothing is broken, just upload again. The
-sketch prints the same reminder every time it asks you for a pose.
+**One exception: a capital `R` restarts the board into its loader** rather
+than recording: it is the escape hatch in TROUBLESHOOTING.md for a board that
+stops accepting uploads. If the board goes quiet and the port disappears after
+you typed something, that is what happened — nothing is broken, upload again.
+The sketch prints the same reminder every time it asks you for a pose.
 
 It trains, tells you how long that took, and starts printing a number that
 follows the board as you move it.
@@ -167,74 +182,56 @@ something sensible. You gave it three points and got back a continuous surface,
 and that surface is the instrument. That is the entire idea, and everything else
 in this project is detail.
 
----
+## 8. See the mapping: `iris_scope`
 
-## Where the rest of it lives
+`iris_scope/` needs the same board and sensor, and instead of printing one
+number it draws the mapping: your demonstrations as dots, and the curve the
+network invented between them. Upload `iris_scope.ino`, **close Serial
+Monitor**, then run `iris_scope/processing/iris_scope/iris_scope.pde` in
+Processing. [iris_scope/README.md](iris_scope/README.md) walks through it.
 
-This tree is the hardware half. The library itself, its decision records and
-its measurements are in the `iris/` repository next to this one:
+Both views are on screen at once. TRANSFER shows what it plays against what you
+did. SCOPE plots the two outputs against each other like an oscilloscope, which
+is where the nonlinearity becomes a shape you can see. Press `d` and the last
+demonstration leaves the picture and the curve relaxes.
 
-- `iris/iris.h` — the library, and the place the mathematics is written down
-- `iris/examples/` — four programs that run on a laptop with no board at all,
-  including one that draws the learned surface as ASCII art
-- `iris/docs/adr/` — 21 numbered decision records, each with the measurement
-  behind it. If you ever wonder "why is it like that", the answer is there.
-- `iris/docs/DEGREES-OF-FREEDOM.md` — why adding outputs is nearly free and
-  adding inputs is not
-
-## Don't have the board? Start here instead
-
-Everything above assumes the ES3C28P and a BNO055. If you have something else —
-an Uno, a Pico, a Teensy, a bare ESP32 — open `boilerplate/any_sensor/` instead.
-It is the same instrument with the hardware taken out: five marked places to
-fill in, and it compiles and runs before you change anything, using two
-analogue pins as a stand-in sensor so you can press the button and watch it
-learn while your real parts are still in the post.
-
-Verified on an Arduino Uno, both Raspberry Pi Pico cores and the ESP32-S3 —
-compiling *and* training, which are different claims. On the Uno the whole
-thing fits in 2 kilobytes of RAM with about 176 bytes of stack to spare, and it
-only fits because the file shrinks the library's working arrays on AVR (see the
-`IRIS_MAX_IN` block at the top). Measured with `avr-gcc -Os -fstack-usage`:
-the deepest frame is 148 bytes with that block and 308 without it, measured
-from a caller with locals of its own; a bare caller measures 128 and 288.
-Either way the block saves 160 bytes.
-
-**Only `boilerplate/any_sensor/` builds for an Uno — 1 of the 10 sketches here.**
-Measured 2026-08-30 with `arduino-cli compile --fqbn arduino:avr:uno` on all ten.
-That is not a defect: the other nine need a screen, an ESP32's USB stack, or
-more RAM than an Uno has, and `boilerplate/bno055_portable/` says so with a build error.
-The rest fail with compiler messages rather than an explanation, which is worth
-knowing before you try one.
-
-`boilerplate/stemma_bno055/` is the same file wired to a real sensor over I2C
-(inter-integrated circuit, the two-wire bus the STEMMA QT cable carries),
-if you want to see what filling in those five places actually looks like.
-
-## Then: the one that makes sound
+## 9. Sound: `iris_instrument`
 
 `iris_instrument/iris_instrument.ino` is the same learning core with a screen
-and real USB-MIDI. You drag three bars to set a sound, hold a pose, tap RECORD,
-and after two demonstrations it plays — one tilt moving three parameters
-together in the relationship you showed it. It shows up as a MIDI device in
-Ableton or any synth. Same board settings, no new libraries.
+and USB MIDI. You drag three bars to set a sound, hold a pose, tap RECORD, and
+after two demonstrations it plays — one tilt moving three parameters together
+in the relationship you showed it. It shows up as a MIDI device in any
+synthesiser or music program that accepts USB MIDI. Same board settings, no
+new libraries.
 
-## Keeping an instrument
+## 10. Keeping an instrument: `boilerplate/stemma_bno055`
 
 Everything above dies when you unplug the board. The demonstrations live in
 memory, and memory goes away with power.
 
-`boilerplate/stemma_bno055/` is the one that keeps them. **Hold SAVE for a
-second** and the whole instrument — the demonstrations and the trained network —
-is written to the board's flash. It comes back by itself the next time you power
-up, and the sketch tells you which happened:
+`boilerplate/stemma_bno055/` keeps them. It reads the sensor and three knobs
+(wiring in PARTS.md), and its SAVE button (the board's BOOT button) does two
+things:
 
-```
-loaded the instrument from last time.
-```
+- **Tap SAVE** (let go within a second): records one demonstration — the pose
+  and the knobs as they were when you pressed — and starts training in the
+  background. The sketch prints `demonstrations: N`, then `trained.` when the
+  training finishes. It plays as soon as there are two.
+- **Hold SAVE** for a second or longer: records nothing. If training is still
+  running it prints `finishing training before saving...` and finishes it.
+  Then it writes the instrument you are playing — every demonstration and the
+  trained network — to the board's flash and prints
+  `kept. 464 bytes in flash, 3 demonstrations, trained.` (the numbers are
+  yours).
 
-Two calls do it, and they are the same two on any board with somewhere to put
-bytes:
+On the next power-up it prints `loaded the instrument from last time.` and
+plays exactly what you were playing when you held SAVE. If the saved
+instrument was not trained (training failed, or it had fewer than two
+demonstrations), it retrains from the saved demonstrations straight after
+loading when there are two or more.
+
+Two calls do the saving, and they are the same two on any board with somewhere
+to put bytes:
 
 ```c
 size_t n = iris_save(k, buffer, sizeof buffer);   /* returns bytes written, 0 if it refused */
@@ -253,48 +250,50 @@ want an instrument to outlive the cable.
 ## Fixing a bad demonstration
 
 If you record a pose you did not mean, you do not start over.
-`boilerplate/any_sensor/` takes **`d`** in the Serial Monitor to delete the last
-demonstration and retrain, and **`c`** to clear everything. That loop —
-demonstrate, listen, delete the bad one, demonstrate again — is the point of
-teaching by showing rather than by typing numbers.
+`boilerplate/any_sensor/` and `iris_scope` take **`d`** in the Serial Monitor
+to delete the last demonstration and retrain, and **`c`** to clear everything.
+That loop — demonstrate, listen, delete the bad one, demonstrate again — is the
+point of teaching by showing rather than by typing numbers.
 
-`display_check/display_check.ino` is a hardware triage sketch. It draws to the
-screen and reports touches, nothing else. If the display or touch seems dead,
-run this before you debug anything more interesting.
+## Don't have the board? Start here instead
 
----
+Everything above assumes the ES3C28P and a BNO055. If you have something else —
+an Uno, a Pico, a Teensy, a bare ESP32 — open `boilerplate/any_sensor/` instead.
+It is the same instrument with the hardware taken out: five marked places to
+fill in, and it compiles and runs before you change anything, using two slow
+waves it makes itself as a stand-in sensor so you can press the button and
+watch it learn while your real parts are still in the post.
 
-## When it doesn't work
+It builds for an Arduino Uno, both Raspberry Pi Pico cores and the ESP32-S3.
+On an Uno it uses 81% of the 2 kilobytes of memory and fits only because the
+file shrinks the library's working arrays on that chip (the `IRIS_MAX_IN`
+block at its top). It is the only sketch here that builds for an Uno: the
+others need a screen, an ESP32's USB, or more memory than an Uno has.
 
-**No port in Tools → Port.** Try a different USB-C cable first. Many are
-charge-only.
+`boilerplate/bno055_portable/` is the same instrument wired to a real BNO055,
+for boards other than the ES3C28P that have more memory than an Uno.
 
-**Serial Monitor is empty.** Baud rate 115200, and check *USB CDC On Boot* is
-Enabled.
+## The checks
 
-**"No BNO055."** The sketch prints every address answering on the two-wire
-I2C bus, so
-you can see whether the sensor is there at all. It tries both 0x28 and 0x29.
-Reseat the STEMMA cable — it clicks when it's seated.
+- `display_check` draws to the screen and reports touches, nothing else. If
+  the display or touch seems dead, run this before you debug anything more
+  interesting.
+- `determinism_check` trains a fixed recipe and prints PASS when the board
+  builds exactly the instrument a laptop builds, bit for bit.
+- `device_torture` asks nine questions of the library on this board — same
+  bits as the laptop, saving through real flash, corrupted files refused,
+  drift, several instruments at once — and prints PASS, FAIL or a labelled
+  figure for each.
+- `board_probe` measures how long one prediction and each kind of training
+  take on this board, properly, and prints one block to keep as a record.
 
-**The board stops accepting uploads.** This is the one that costs people an
-afternoon, so read it before you need it.
+## Where the rest of it lives
 
-The ESP32-S3 can latch into a state where the IDE stops seeing its port. The
-physical recovery is: **hold BOOT, tap RESET, release BOOT.** That puts it in
-download mode ready to flash.
+This tree is the hardware half. The library itself, its decision records and
+its measurements are at https://github.com/kylebsmith/iris (these copies are
+version 0.2.0):
 
-Both sketches also carry a software escape hatch, because a board in an
-enclosure has no reachable buttons. Send **`R`** over Serial and it reboots into
-the bootloader, ready to flash. `iris_instrument` additionally answers to **CC
-123 value 127 on MIDI channel 16**, for when it is enumerated as a MIDI device
-and you have no serial terminal open.
-
-If you write your own sketch, build the escape hatch in **before** you flash it,
-not after. That is the whole lesson of this section.
-
-**The sound jumps instead of sweeping.** If you've modified the sketch to read
-orientation in degrees, that's why. Euler angles wrap from +180 to −180, so two
-poses a degree apart arrive as opposite ends of the range and no smooth mapping
-can survive it. Both sketches read the gravity vector instead, which points down
-and never wraps.
+- `iris.h` — the library, and the place the mathematics is written down
+- `examples/` — programs that run on a laptop with no board at all
+- `docs/adr/` — numbered decision records, each with the measurement behind
+  it. If you ever wonder "why is it like that", the answer is there.
