@@ -5,7 +5,10 @@
    in by the network, and that in-between is the instrument.
 
    HARDWARE
-     ES3C28P (ESP32-S3) + Adafruit BNO055 absolute orientation on STEMMA QT.
+     ES3C28P (ESP32-S3) + Adafruit BNO055 orientation sensor (Adafruit 4646)
+     on the board's I2C socket (I2C, inter-integrated circuit: the two-wire
+     bus the sensor talks on). PARTS.md shows the cables and which wire goes
+     where.
 
    LIBRARIES  (Tools -> Manage Libraries, search and install)
      Adafruit BNO055
@@ -31,16 +34,20 @@
      BOOT. Build an escape hatch into anything you write before you flash it,
      not after.
 
-   USB MODE: either works. In USB-OTG (TinyUSB) mode 'R' uses the core's
-   usb_persist_restart. In Hardware CDC and JTAG mode it sets the chip's
-   force-download flag and restarts, which the chip's built-in loader reads
-   at boot; that path is not yet tested on the board.
+   USB MODE (USB, Universal Serial Bus): either works. In USB-OTG (On-The-Go,
+   driven by the TinyUSB software) mode 'R' uses the core's
+   usb_persist_restart. In Hardware CDC and JTAG mode (the chip's fixed
+   serial-and-debug port: CDC, Communications Device Class, is the USB serial
+   standard; JTAG, Joint Test Action Group, a debugging interface) it sets the
+   chip's force-download flag and restarts, which the chip's built-in loader
+   reads at boot; that path is not yet tested on the board.
 
    WHY THIS PRINTS INSTEAD OF SENDING MIDI
      Printing proves the learning works with nothing between the network and
      your eyes. iris_instrument is the next step: it sends MIDI (Musical
      Instrument Digital Interface, the standard message format synthesisers
-     understand) over USB, which needs the TinyUSB mode.
+     understand) over USB, which needs the TinyUSB mode. The number printed
+     here runs 0 to 127, the range of one MIDI controller value.
    --------------------------------------------------------------------------- */
 
 #include <Wire.h>
@@ -112,17 +119,19 @@ void setup() {
   Serial.println("\niris_tilt\n");
 
   if (!bno.begin()) {
-    bno = Adafruit_BNO055(55, 0x29, &Wire);      /* ADR pad bridged? */
+    bno = Adafruit_BNO055(55, 0x29, &Wire);      /* address-select (ADR) pad bridged? */
   }
   if (!bno.begin()) {
-    /* Say what is actually on the bus rather than just failing. Nine times out
-       of ten the STEMMA cable is not fully clicked in at one end. */
+    /* Say what is actually on the bus rather than just failing. 0x38 (touch)
+       and 0x18 (audio codec) are the board's own chips and answer whatever
+       the sensor does. */
     Serial.println("No BNO055. Devices answering on I2C:");
     for (uint8_t a = 8; a < 120; ++a) {
       Wire.beginTransmission(a);
       if (Wire.endTransmission() == 0) Serial.printf("  0x%02X\n", a);
     }
-    Serial.println("Expected 0x28 (or 0x29). Reseat the cable and press RESET.");
+    Serial.println("Expected 0x28 or 0x29 (0x18 and 0x38 are the board's own chips).");
+    Serial.println("Check the sensor's four wires against PARTS.md and press RESET.");
     while (1) delay(1000);
   }
 
@@ -188,10 +197,10 @@ void loop() {
     held = 0;
     if (recorded < 3) {
       float target = TARGETS[recorded] / 127.0f;         /* keep MIDI in 0..1 */
-      /* Count what the library ACCEPTED, not what we offered it. These used
-         to drift apart: a refused reading still bumped our own counter, so
-         the sketch said "recorded 3" while the instrument held 2, trained on
-         2, played a smooth plausible number, and never mentioned it. */
+      /* Count what the library ACCEPTED, not what we offered it. A counter
+         bumped for a refused reading would say "recorded 3" while the
+         instrument held 2, trained on 2 and played a smooth, plausible
+         number without mentioning it. */
       if (!iris_record(k, in, &target))
         Serial.println("that reading was refused -- not counted. Try again.");
       else {
@@ -225,8 +234,8 @@ void loop() {
         }
         float spread = (hi[0] - lo[0]) > (hi[1] - lo[1]) ? hi[0] - lo[0] : hi[1] - lo[1];
         /* seen guards the sentinels: with no readable demonstrations lo and hi
-           keep their +/-1e30 starting values and this printed "your three poses
-           were only -2000000000000000000000000000000.0 apart". */
+           keep their +/-1e30 starting values, and the warning below would
+           print a spread of -2e30. */
         if (seen > 0 && spread < 2.0f)   /* metres per second squared, of ~9.8 */
           Serial.printf("heads up: your three poses were only %.1f apart. That is "
                         "very close,\nso expect an abrupt mapping. Send 'c' and "
@@ -243,10 +252,10 @@ void loop() {
       last = millis();
       float out;
       iris_predict(k, in, &out);
-      int cc = (int)(out * 127.0f + 0.5f);
-      Serial.printf("tilt %6.2f %6.2f  ->  CC %3d  ",
-                    in[0], in[1], cc);
-      for (int i = 0; i < cc / 4; ++i) Serial.print('#');
+      int value = (int)(out * 127.0f + 0.5f);          /* 0..127, a MIDI controller value */
+      Serial.printf("tilt %6.2f %6.2f  ->  %3d  ",
+                    in[0], in[1], value);
+      for (int i = 0; i < value / 4; ++i) Serial.print('#');
       Serial.println();
     }
   }
