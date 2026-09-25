@@ -14,7 +14,9 @@ The order of this page is the order to run the sketches in:
 1. `i2c_find` — is the sensor wired right?
 2. `iris_tilt` — the first instrument: tilt, teach three poses, play
 3. `iris_scope` — see the mapping the network invents, drawn as a curve
-4. `iris_instrument` — the same learning with a screen and USB MIDI sound
+4. `iris_instrument` — the same learning with a screen and sound: MIDI
+   (Musical Instrument Digital Interface, the message format synthesisers
+   understand) over the USB (Universal Serial Bus) cable
 5. `boilerplate/stemma_bno055` — an instrument that survives a power cycle
 
 `boilerplate/any_sensor` is the starting point on any other board.
@@ -42,11 +44,11 @@ and what connects to what. In short:
 
 ## 1. Get these files, and the Arduino IDE
 
-Download this repository: the green **Code** button on its GitHub page →
-**Download ZIP**, then unzip it somewhere you will find again. It unpacks into a
-folder with `iris_tilt/`, `iris_instrument/` and this page inside it. If you use
-git, `git clone` the same URL instead — it makes no difference to anything
-below.
+Download this repository: the green **Code** button on its GitHub page
+(https://github.com/kylebsmith/iris-starter) → **Download ZIP**, then unzip it
+somewhere you will find again. It unpacks into a folder with `iris_tilt/`,
+`iris_instrument/` and this page inside it. If you use git, `git clone` the
+same address instead — it makes no difference to anything below.
 
 Then install Arduino IDE 2.x (IDE: integrated development environment, the
 program you write and upload sketches with) from arduino.cc.
@@ -83,9 +85,9 @@ first five.
 > **You do not install iris.** `iris.h`, the library itself, is copied into
 > every sketch folder that uses it, and Arduino picks up headers next to a
 > sketch automatically. Every copy is iris **0.2.0**, from
-> https://github.com/kylebsmith/iris, and every sketch checks at compile time
-> that its copy is iris 0.2: a different version stops the build with a
-> message saying which file to copy.
+> https://github.com/kylebsmith/iris, and every sketch that uses it checks at
+> compile time that its copy is iris 0.2: a different version stops the
+> build with a message saying which file to copy.
 >
 > The Adafruit libraries are drivers — they talk to a specific screen and a
 > specific sensor, and if one of them breaks you swap it for another and your
@@ -102,7 +104,7 @@ first five.
 | USB Mode | **USB-OTG (TinyUSB)** | USB is Universal Serial Bus. USB-OTG (On-The-Go) is the chip's full USB controller, driven by TinyUSB, an open-source USB software stack; it is what lets the board appear as a MIDI instrument. The other choice, **Hardware CDC and JTAG**, is the chip's fixed serial-and-debug port (CDC: Communications Device Class, the USB standard for a serial port; JTAG: Joint Test Action Group, a debugging interface). |
 | USB CDC On Boot | **Enabled** | Makes the board's USB socket the serial port Serial Monitor reads. |
 | Flash Size | **16MB (128Mb)** | The board's flash memory chip: 16 megabytes. |
-| PSRAM | **OPI PSRAM** | PSRAM (pseudo-static RAM) is the board's extra memory chip; OPI (octal peripheral interface) is the 8-wire link to it. |
+| PSRAM | **OPI PSRAM** | PSRAM (pseudo-static random-access memory) is the board's extra memory chip; OPI (octal peripheral interface) is the 8-wire link to it. |
 | Partition Scheme | **16M Flash (3MB APP/9.9MB FATFS)** | How the flash is divided: 3 MB for your sketch (the app), 9.9 MB for files (FATFS: a FAT file system). |
 
 This combination is the one tested on this board. **Only the first two
@@ -120,15 +122,18 @@ build in the other mode. Every other sketch also builds in Hardware CDC and
 JTAG mode, the board's default, but that mode is not yet tested on this board,
 so stay with the table.
 
-The sketches written for this board also refuse to build if **Tools → Board**
-is anything but ESP32S3 Dev Module. If you see a red message starting `Set
-Tools ->`, read it, change the setting, upload again.
+`iris_tilt`, `iris_instrument`, `display_check` and `board_probe` also refuse
+to build if **Tools → Board** is another ESP32 entry. The rest are written to
+build for any ESP32, so with the wrong entry they build and the upload fails
+instead, because the chip is not the one the build was for. If you see a red
+message starting `Set Tools ->`, read it, change the setting, upload again.
 
 ## 5. Connect the sensor
 
 The board's I2C socket (I2C, inter-integrated circuit: the two-wire bus that
 carries data and clock on two pins) is **1.25 mm** pitch. The sensor's STEMMA
-QT socket is **1.0 mm**, so a STEMMA QT cable does not fit the board.
+QT socket (Adafruit's 4-pin I2C connector) is **1.0 mm**, so a STEMMA QT
+cable does not fit the board.
 [PARTS.md](PARTS.md) shows the join without soldering: the board's own lead
 into the board, Adafruit's 4209 cable into the sensor, and 4209's four pins
 into the lead by signal — 3.3 V, ground, data (SDA) to GPIO 16, clock (SCL) to
@@ -225,10 +230,10 @@ things:
   yours).
 
 On the next power-up it prints `loaded the instrument from last time.` and
-plays exactly what you were playing when you held SAVE. If the saved
-instrument was not trained (training failed, or it had fewer than two
-demonstrations), it retrains from the saved demonstrations straight after
-loading when there are two or more.
+plays exactly what you were playing when you held SAVE. An instrument saved
+untrained with two or more demonstrations (its training had failed) retrains
+from them straight after loading. One saved with a single demonstration
+plays nothing until the next tap records a second.
 
 Two calls do the saving, and they are the same two on any board with somewhere
 to put bytes:
@@ -243,9 +248,9 @@ corrupted file is refused rather than played as an instrument you did not make.
 You do not have to know the format. If you want the size before you write
 anything, `iris_save_size(k)` tells you.
 
-The other sketches deliberately do not save, so that the first thing you flash
-is as short as it can be. Copy the two calls out of `stemma_bno055` when you
-want an instrument to outlive the cable.
+The other instruments deliberately do not save, so that the first thing you
+flash is as short as it can be. Copy the two calls out of `stemma_bno055`
+when you want an instrument to outlive the cable.
 
 ## Fixing a bad demonstration
 

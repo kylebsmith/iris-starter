@@ -23,8 +23,8 @@ what would you try? One paper. Not a literature review — I'll give you the lis
 ## Week 2 — the one that makes the point
 
 **Try to install a dead tool.** Pick one from the list I'll hand out — MnM
-(the Mapping is not Music toolkit for Max), GRT (the Gesture Recognition
-Toolkit), an old Wekinator example patch. Try to build and run it. Write down exactly
+(IRCAM's mapping toolbox for Max), GRT (the Gesture Recognition Toolkit), an
+old Wekinator example patch. Try to build and run it. Write down exactly
 what broke and how far you got.
 *Needs: none, and stubbornness helps.*
 

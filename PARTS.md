@@ -3,31 +3,35 @@
 Everything the sketches here need, what each part connects to, and where the
 facts come from. Prices change; the part numbers do not.
 
+Terms used on this page: **USB** (Universal Serial Bus) is the cable
+between the board and your computer; USB-C is its reversible plug. **I2C**
+(inter-integrated circuit) is the two-wire bus that carries a data line
+(SDA) and a clock line (SCL) between the board and the sensor. **STEMMA QT**
+is Adafruit's name for its 4-pin I2C connector, a JST SH socket at 1.0 mm
+pitch, compatible with SparkFun's Qwiic. **Pitch** is the distance between
+neighbouring pins. **IMU** (inertial measurement unit) is a motion sensor;
+the BNO055 is one, and its "9-DOF" (nine degrees of freedom) means it
+measures motion, rotation and magnetic field on three axes each. **MIDI**
+(Musical Instrument Digital Interface) is the message format synthesisers
+understand. **GPIO** (general-purpose input/output) is a numbered pin of the
+chip. **GND** is ground.
+
 | Part | Manufacturer part number | Where to get it | Qty | Connects to |
 |---|---|---|---|---|
-| 2.8-inch ESP32-S3 display board with capacitive touch | LCDWIKI **ES3C28P** (the ES3N28P is the same board without touch; `display_check` and `iris_instrument` need touch) | Manufacturer page: http://www.lcdwiki.com/2.8inch_ESP32-S3_Display · one distributor listing: https://www.alibaba.com/product-detail/ES3C28P-ES3N28P-2-8-inch-ESP32_1601603512242.html (check that the listing names ES3C28P) | 1 | Your computer, by USB-C |
-| Orientation sensor | Adafruit **4646**, "9-DOF Absolute Orientation IMU Fusion Breakout - BNO055 - STEMMA QT / Qwiic" | https://www.adafruit.com/product/4646 | 1 | The board's I2C socket, through the two cables below |
-| Sensor cable | Adafruit **4209**, "STEMMA QT / Qwiic JST SH 4-pin to Premium Male Headers Cable - 150mm" | https://www.adafruit.com/product/4209 | 1 | Sensor's STEMMA QT socket to the board's lead (below) |
+| 2.8-inch ESP32-S3 display board with capacitive touch | LCDWIKI **ES3C28P** (the ES3N28P is the same board without touch; `display_check` and `iris_instrument` need touch) | Manufacturer page: http://www.lcdwiki.com/2.8inch_ESP32-S3_Display (it names no shop). Sold on online marketplaces under the model number: check that the listing says ES3C28P, not ES3N28P | 1 | Your computer, by USB-C |
+| Orientation sensor | Adafruit **4646**, "Adafruit 9-DOF Absolute Orientation IMU Fusion Breakout - BNO055 - STEMMA QT / Qwiic" | https://www.adafruit.com/product/4646 | 1 | The board's I2C socket, through the two cables below |
+| Sensor cable | Adafruit **4209**, "STEMMA QT / Qwiic JST SH 4-pin to Premium Male Headers Cable - 150mm Long" | https://www.adafruit.com/product/4209 | 1 | Sensor's STEMMA QT socket to the board's lead (below) |
 | Board lead | the "4P 1.25mm to 2.54mm terminal wire" that ships with the ES3C28P (vendor specification page 4) | in the box | 1 | Board's I2C socket to the sensor cable |
 | USB-C cable **that carries data** | any | any | 1 | Board to computer. A charge-only cable looks like a dead board. |
 | 10 kΩ linear potentiometers (knobs) | Adafruit **562**, "Panel Mount 10K potentiometer (Breadboard Friendly) - 10K Linear" (any 10 kΩ linear potentiometer works) | https://www.adafruit.com/product/562 | 3 | Only for the three `boilerplate/` sketches and `iris_scope` with `USE_ANALOG 1`: the board's expansion socket |
 | A synthesiser that accepts USB MIDI | any: a software synth, a digital audio workstation, or a hardware synth with USB MIDI in | — | 1 | Only for `iris_instrument`, over the same USB cable |
-
-Terms used on this page: **I2C** (inter-integrated circuit) is the two-wire
-bus that carries a data line (SDA) and a clock line (SCL) between the board
-and the sensor. **STEMMA QT** is Adafruit's name for its 4-pin I2C connector,
-a JST SH socket at 1.0 mm pitch, compatible with SparkFun's Qwiic. **Pitch**
-is the distance between neighbouring pins. **IMU** (inertial measurement
-unit) is a motion sensor; the BNO055 is one. **MIDI** (Musical Instrument
-Digital Interface) is the message format synthesisers understand. **GPIO**
-(general-purpose input/output) is a numbered pin of the chip.
 
 ## Connecting the sensor
 
 The board's I2C socket is a **1.25 mm** 4-pin socket (vendor specification,
 ES3C28P/ES3N28P Specification V1.0, page 9, "I2C peripheral interface: 1.25mm
 4P socket"; https://www.lcdwiki.com/2.8inch_ESP32-S3_Display, "IIC
-interface"). The sensor's STEMMA QT socket is **1.0 mm** (JST SH;
+interface"; IIC is another name for I2C). The sensor's STEMMA QT socket is **1.0 mm** (JST SH;
 https://www.adafruit.com/product/4209, "1mm pitch"). A STEMMA QT cable
 therefore does not fit the board. Join them without soldering like this:
 

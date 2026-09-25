@@ -13,6 +13,10 @@ microcontroller) with a touch screen.
 [PARTS.md](PARTS.md); when something goes wrong, see
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
+I2C (inter-integrated circuit) is the two-wire bus the sensor talks on; USB is
+Universal Serial Bus; MIDI (Musical Instrument Digital Interface) is the
+message format synthesisers understand.
+
 In the order GET-STARTED.md runs them:
 
 ```
@@ -35,26 +39,22 @@ TROUBLESHOOTING.md       symptom, likely cause, what to do
 TASKS.md                 what to pick up
 ```
 
-I2C (inter-integrated circuit) is the two-wire bus the sensor talks on; USB is
-Universal Serial Bus; MIDI (Musical Instrument Digital Interface) is the
-message format synthesisers understand.
-
 Compiler output for each, on the settings in GET-STARTED.md (esp32 board
 package 3.3.3):
 
-| sketch | flash (program storage) | RAM (working memory) |
+| sketch | flash (program storage) | RAM (random-access memory, the working memory) |
 |---|---|---|
-| `iris_tilt` | 404,147 B (12%) | 46,368 B (14%) |
-| `display_check` | 409,371 B (13%) | 45,520 B (13%) |
-| `iris_instrument` | 423,487 B (13%) | 47,264 B (14%) |
+| `iris_tilt` | 404,263 B (12%) | 46,368 B (14%) |
+| `display_check` | 409,519 B (13%) | 45,520 B (13%) |
+| `iris_instrument` | 423,619 B (13%) | 47,264 B (14%) |
 
 Almost all of that is the Arduino and USB runtime. iris itself is a few
 kilobytes: `iris_tilt`'s whole instrument — weights, demonstrations and all —
 is its 944-byte `memory` array, `IRIS_ARENA(2, 12, 1, 8)`. That figure is a
 compile-time assertion with the ESP32-S3's own compiler
 (xtensa-esp32s3-elf-gcc 14.2.0); the same macro gives 1,024 bytes on a 64-bit
-laptop (Apple clang and gcc 15 on 64-bit ARM), because pointers there are
-twice as wide.
+laptop (Apple clang and gcc 15 on a 64-bit Arm processor), because pointers
+there are twice as wide.
 
 ---
 
@@ -106,8 +106,8 @@ becomes sound, so if *it* moves, your instrument silently becomes a different
 instrument — same demonstrations, different result. That is why it has no
 dependencies, why its behaviour is pinned by hashes in its own test suite, and
 why it's a single file sitting next to your sketch rather than something you
-install. Each sketch checks at compile time that its copy is iris 0.2 and
-names the file to copy when it is not.
+install. Each sketch that uses it checks at compile time that its copy is
+iris 0.2 and names the file to copy when it is not.
 
 You should own your instrument. A stranger's commit shouldn't be able to
 restring it.
@@ -130,10 +130,12 @@ a number on a screen. What's obviously missing is missing on purpose.
 - **The screen.** Showing the learned space rather than a number changes how it
   feels to train.
 - **More demonstrations, and deleting bad ones.** `iris_delete_id` deletes a
-  take. `iris_worst_example_id` names the take that fought the others hardest,
-  once there are at least 12 (`IRIS_STRESS_MIN_EX`); below that it returns -1.
+  take. `iris_worst_example_id` names the take that fought the others hardest
+  in the last training run, once there are at least 12
+  (`IRIS_STRESS_MIN_EX`); below that, or before any training, it returns -1.
   `iris_loo_error` answers a different question: one leave-one-out error for
-  the whole instrument, how well it predicts takes it did not see.
+  the whole instrument, how well it predicts takes it did not see. It
+  retrains the instrument while it works, so call `iris_train` afterwards.
 
 ## What this repo is holding itself to
 
@@ -141,19 +143,22 @@ These were agreed before any of it was built, and they are the standard to
 judge a change against:
 
 - One clone. No submodules, no package manager, no build script to read first.
-- Opens in the Arduino IDE.
+- Opens in the Arduino IDE (integrated development environment).
 - A wrong board setting produces a **compiler error with a human message**,
   never a bricked board. Every sketch stops at compile time when USB CDC On
-  Boot is off on the ESP32-S3; the sketches written for this board stop when
-  the board entry is not the ESP32-S3; `iris_instrument` stops when USB Mode is
-  not USB-OTG (TinyUSB). Each message names the menu item and says why.
+  Boot (the setting that makes the USB socket the serial port) is off on the
+  ESP32-S3; `iris_tilt`, `iris_instrument`,
+  `display_check` and `board_probe`, which use this board's own pins or
+  timer, stop when the board entry is another ESP32; `iris_instrument` stops
+  when USB Mode is not USB-OTG (On-The-Go, driven by TinyUSB). Each message names the menu item
+  and says why.
 - First sound in under fifteen minutes, from zero prior experience.
 - Everything you add is a module behind the existing interface. The core is
   frozen and is not yours to edit.
 
 ## A note on how I want you to work
 
-Use whatever tools you want, including AI ones. I'd rather you were fluent with
+Use whatever tools you want, including AI (artificial intelligence) ones. I'd rather you were fluent with
 them than pretend otherwise. But the thing that makes that work isn't the
 prompting, it's the verifying.
 
@@ -166,7 +171,7 @@ would? Same standard whether a person or a model wrote the line.
 
 ## Licence
 
-BSD 3-Clause — see [LICENSE](LICENSE). The copies of `iris.h` in each sketch
-folder are the same file under the same terms, kept in step by `sync-iris.sh`
+BSD 3-Clause — see [LICENSE](LICENSE). The copies of `iris.h` in the sketch
+folders are the same file under the same terms, kept in step by `sync-iris.sh`
 (`sh sync-iris.sh` checks them against the library, `--fix` re-copies).
 Use, change and redistribute the sketches freely; that is what they are for.

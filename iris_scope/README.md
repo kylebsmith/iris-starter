@@ -17,13 +17,15 @@ The sketch searches for the sensor across the pin pairs the common ESP32-S3
 boards use, so you do not have to know which pins yours is on.
 
 No sensor at all? Set `USE_ANALOG 1` at the top and turn a potentiometer on
-`ANALOG_PIN`: GPIO 2 on the ES3C28P's expansion socket (wiring in PARTS.md;
-check it on the board), A0 on other boards.
+`ANALOG_PIN`: GPIO 2 (GPIO: general-purpose input/output, a numbered pin of
+the chip) on the ES3C28P's expansion socket (wiring in PARTS.md; check it on
+the board), A0 on other boards.
 
 ## Run it
 
 1. Flash `iris_scope.ino`. **Close the Serial Monitor** — Processing cannot open
-   the port while the Arduino IDE is holding it.
+   the port while the Arduino IDE (integrated development environment) is
+   holding it.
 2. Open `processing/iris_scope/iris_scope.pde` in
    [Processing](https://processing.org) and press Run.
 3. Click where you want this pose to mean. Press **SPACE**.
@@ -34,12 +36,13 @@ Two poses is enough. You now have a curve.
 ## The two views — both on screen at once
 
 **TRANSFER.** Horizontal is your sensor, vertical is what the instrument plays.
-The big green dots are the two things you said. The line through them is what
-the network made up.
+The big green dots are what you said: one pair for each pose you taught, one
+dot per output. The two lines are what the network made up.
 
-That line is the whole idea. You supplied two points. The line has ninety-six.
-The other ninety-four were invented, and playing the instrument means moving
-through them.
+Those lines are the whole idea. You supplied two poses. Each line is
+ninety-six points, every one of them the network's answer at an input you
+did not necessarily teach, and playing the instrument means moving through
+them.
 
 **SCOPE.** The two outputs plotted against each other, the way an oscilloscope
 in X-Y mode plots two voltages against each other instead of against time. One
@@ -58,8 +61,8 @@ than a fader.
 3. **Press `d`** to delete that pose. Its dot leaves the picture at once and
    the curve relaxes as the network retrains. This is the repair loop: a bad
    take is deleted, not started over.
-4. **Put two different answers at the same pose.** The curve goes flat and the
-   board tells you why. The network is not broken — you asked for two things at
+4. **Press `c`, then teach two different answers at the same pose.** The curve
+   goes flat and the board tells you why. The network is not broken — you asked for two things at
    once and it gave you the average, which is the only honest answer.
 5. **Look at SCOPE** while you move slowly. You are tracing the mapping.
    Both panels are drawn at once, so there is no view to switch to.
@@ -114,7 +117,7 @@ To go further, start from `boilerplate/any_sensor`, which takes any shape.
 
 Adding outputs that **move together** is free — measured: eight coordinated
 outputs are slightly *more* accurate than one, because every demonstration
-teaches all eight at once. Adding outputs you want to move **independently**
-costs you about one demonstration's worth of evidence each. The numbers, and
-the program that produces them, are in the library's
-`docs/DEGREES-OF-FREEDOM.md`.
+teaches all eight at once. Outputs you want to move **independently** are
+expensive: eight of them need roughly eight times the demonstrations, because
+each one asks a separate question. The numbers, and the program that
+produces them, are in the library's `docs/DEGREES-OF-FREEDOM.md`.
