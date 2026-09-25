@@ -5,8 +5,12 @@
    that is what is in the kit, but the SHAPE is what to copy: every STEMMA QT
    board is the same four steps.
 
-   WIRING: one cable. STEMMA QT is polarised and only fits one way, so there
-   is nothing to get backwards and nothing to solder.
+   WIRING: the sensor goes on the board's I2C socket (I2C, inter-integrated
+   circuit: the two-wire bus that carries data and clock on two pins). That
+   socket is 1.25 mm pitch and the sensor's STEMMA QT socket is 1.0 mm, so a
+   STEMMA QT cable does not fit the board: PARTS.md lists the lead and
+   adapter cable that join them, and which wire goes where. Three knobs go on
+   the expansion socket (below).
 
    LIBRARIES: Tools -> Manage Libraries, install "Adafruit BNO055". Say yes
    when it offers its dependencies. A different sensor means a different
@@ -70,7 +74,17 @@
 #define SDA_PIN   16        /* your board's I2C pins; on many boards Wire.begin() */
 #define SCL_PIN   15        /* with no arguments is already correct */
 
-static const int POT_PIN[] = { 4, 5, 6 };
+/* THE KNOBS. On the ES3C28P they go on the expansion socket, a 1.25 mm
+   four-pin socket carrying GPIO 2, 3, 14 and 21 (vendor specification,
+   ES3C28P/ES3N28P Specification V1.0, pages 9 and 12). GPIO 2 and 3 are on
+   the chip's first analog-to-digital converter and GPIO 14 on its second;
+   GPIO 21 cannot read a voltage. The socket carries no power, so each knob's
+   outer legs take 3.3 V and ground from elsewhere (see PARTS.md).
+   CHECK ON THE BOARD: that the socket's pins are in this order and that
+   GPIO 14 reads a knob's full travel (the second converter is not used by
+   anything else in these sketches). The pins 4, 5 and 6 used before are the
+   board's audio lines and reach no connector. */
+static const int POT_PIN[] = { 2, 3, 14 };
 static Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
 static Preferences store;
 
@@ -102,12 +116,9 @@ typedef char POT_PIN_must_have_exactly_N_OUTPUTS_entries
              [(sizeof POT_PIN / sizeof POT_PIN[0]) == N_OUTPUTS ? 1 : -1];
 
 static unsigned char memory[IRIS_ARENA(N_INPUTS, 12, N_OUTPUTS, N_DEMOS)];
-/* Sized from the arena, not from a guess. A saved instrument is always
-   smaller than the memory it was living in -- checked across 5,346 shapes --
-   so this cannot be too small, and it follows N_INPUTS and N_DEMOS if you
-   change them. A fixed 1024 here was fine for the shape below and silently
-   too small the moment you set N_INPUTS to 3, which the comment above
-   invites you to do. */
+/* Sized from the arena, not from a guess: a saved instrument is smaller than
+   the memory it lives in, so this follows N_INPUTS and N_DEMOS if you change
+   them. keep_instrument checks iris_save's answer all the same. */
 static unsigned char saved[sizeof memory];
 static iris *k;
 
@@ -153,14 +164,15 @@ void setup() {
     bno = Adafruit_BNO055(55, 0x29, &Wire);
   }
   if (!bno.begin()) {
-    /* Say what is actually on the bus. Nine times in ten the STEMMA cable is
-       not fully clicked in at one end, and it clicks. */
+    /* Say what is actually on the bus. 0x38 (touch) and 0x18 (audio codec)
+       are the board's own chips and answer whatever the sensor does. */
     Serial.println(F("No BNO055. Devices answering on I2C:"));
     for (uint8_t a = 8; a < 120; ++a) {
       Wire.beginTransmission(a);
       if (Wire.endTransmission() == 0) { Serial.print(F("  0x")); Serial.println(a, HEX); }
     }
-    Serial.println(F("Expected 0x28 or 0x29. Reseat the cable and press RESET."));
+    Serial.println(F("Expected 0x28 or 0x29 (0x18 and 0x38 are the board's own chips)."));
+    Serial.println(F("Check the sensor's four wires against PARTS.md and press RESET."));
     for (;;) delay(1000);
   }
 

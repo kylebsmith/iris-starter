@@ -6,12 +6,11 @@
 
    Fill in the five places marked FILL THIS IN. Everything else is done.
 
-   Compiles and runs as it stands -- the placeholder sensor is two analogue
-   pins -- so you can flash it and press the button before your real sensor
-   even arrives. Verified on an Arduino Uno, a Nano Every, both Raspberry Pi
-   Pico cores and the ESP32-S3: it uses no board-specific calls. (An earlier
-   version used Serial.printf, which is an Espressif extension, and so failed
-   on three of those four while its own header claimed it ran anywhere.)
+   Compiles and runs as it stands -- the placeholder sensor is two slow
+   waves the sketch makes itself -- so you can flash it and press the button
+   before your real sensor even arrives. It uses no board-specific calls, so
+   it builds for an Arduino Uno, a Nano Every, both Raspberry Pi Pico cores
+   and the ESP32-S3.
    ========================================================================= */
 /* ON A SMALL BOARD THE WORKING ARRAYS ARE THE STACK BUDGET.
    iris.h sizes nine internal arrays from these maxima rather than from the
@@ -82,16 +81,29 @@
 #define ADC_MAX  1023.0f
 #endif
 
-/* One knob per output. There must be exactly N_OUTPUTS of them. */
-static const int POT_PIN[] = { 4, 5, 6 };
+/* One knob per output. There must be exactly N_OUTPUTS of them.
+   On an ESP32 these are the ES3C28P's expansion-socket pins, the only ones on
+   that board that reach a connector and read a voltage (GPIO 2 and 3 on the
+   first analog-to-digital converter, GPIO 14 on the second; CHECK ON THE
+   BOARD, see boilerplate/stemma_bno055 and PARTS.md). Elsewhere, A0-A2. */
+#if defined(ARDUINO_ARCH_ESP32)
+static const int POT_PIN[] = { 2, 3, 14 };
+#else
+static const int POT_PIN[] = { A0, A1, A2 };
+#endif
 
 /* ---- FILL THIS IN 2: READ YOUR SENSOR -----------------------------------
    One line per input, and there must be exactly N_INPUTS of them.
    Any units at all: iris fits its range to whatever you actually give it, so
    do NOT scale, centre or normalise. Raw readings are correct. */
 static void read_sensor(float *in) {
-  in[0] = analogRead(1);              /* <<< YOUR SENSOR HERE */
-  in[1] = analogRead(2);              /* <<< one line per input */
+  /* THE STAND-IN: two slow triangle waves, 7 and 11 seconds long, so the
+     "sensor" moves by itself and you can press the button and watch it learn
+     with nothing wired. Replace both lines with your readings. */
+  in[0] = (float)(millis() % 7000u);  /* <<< YOUR SENSOR HERE */
+  in[1] = (float)(millis() % 11000u); /* <<< one line per input */
+  if (in[0] > 3500.0f) in[0] = 7000.0f - in[0];
+  if (in[1] > 5500.0f) in[1] = 11000.0f - in[1];
 }
 
 /* ---- FILL THIS IN 3: WHERE DOES THE TARGET COME FROM? -------------------

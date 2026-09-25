@@ -3,11 +3,12 @@
    you already know whether the panel and the touch controller are good. */
 
 #include <SPI.h>
-/* THIS SKETCH IS FOR ONE BOARD: the Adafruit ESP32-S3 Reverse TFT Feather.
-   It drives that board's TFT over SPI on fixed pins and talks to its touch
-   controller, so it will not build for an Uno, a Pico or a plain ESP32 --
-   that is the hardware, not a bug. iris.h itself runs on all of them; see
-   boilerplate/any_sensor for the version that does.  */
+/* THIS SKETCH IS FOR ONE BOARD: the ES3C28P (LCDWIKI's 2.8-inch ESP32-S3
+   display board). It drives that board's TFT (thin-film transistor) screen,
+   an ILI9341 at 240 x 320, over SPI (serial peripheral interface, the fast
+   four-wire bus screens use) on its fixed pins, and talks to its FT6336
+   touch controller on I2C at 0x38, so it will not build for an Uno, a Pico
+   or a plain ESP32 -- that is the hardware, not a bug. */
 #include <Wire.h>
 
 /* BOARD SETTINGS. This sketch drives the ES3C28P's own pins, so it needs

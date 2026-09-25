@@ -37,9 +37,19 @@
 #endif
 
 #define SAVE_BTN 0                 /* BOOT button */
-#define POT_A 4
-#define POT_B 5
-#define POT_C 6
+/* The knobs. On an ESP32 these are the ES3C28P's expansion-socket pins, the
+   only ones on that board that reach a connector and read a voltage (CHECK
+   ON THE BOARD, see boilerplate/stemma_bno055 and PARTS.md). Elsewhere,
+   A0-A2. */
+#if defined(ARDUINO_ARCH_ESP32)
+#define POT_A 2
+#define POT_B 3
+#define POT_C 14
+#else
+#define POT_A A0
+#define POT_B A1
+#define POT_C A2
+#endif
 
 /* An ESP32's analogue inputs are 12-bit and read up to 4095. Almost everything
    else in the Arduino world is 10-bit and reads up to 1023. Dividing by the

@@ -143,7 +143,7 @@ static unsigned char arena[IRIS_ARENA(N_IN, N_HID, NOUT, MAXEX)];
 static iris *k;
 
 static int  value[NOUT] = { 64, 64, 64 };  /* the CCs in force RIGHT NOW */
-static int  drawn[NOUT] = { -1, -1, -1 };  /* what is currently on the glass */
+static int  drawn[NOUT] = { -1, -1, -1 };  /* what is currently drawn on the screen */
 static int  demos   = 0;
 static bool editing = true;                /* setting a sound, not playing */
 

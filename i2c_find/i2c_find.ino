@@ -10,7 +10,9 @@
    each. Then it tells you which line to paste into your sketch.
 
    Known addresses it will name for you:
-     0x28 / 0x29   BNO055 orientation      0x33 / 0x1C  LIS3MDL / LSM6DS
+     0x28 / 0x29   BNO055 orientation      0x1C / 0x1E  LIS3MDL magnetometer
+     0x6A / 0x6B   LSM6DS motion           0x38 / 0x18  the ES3C28P's own touch
+                                                        controller and audio codec
      0x68 / 0x69   MPU6050, ICM20948       0x77 / 0x76  BMP/BME pressure
      0x29          VL53L4CD distance       0x5A         MPR121 touch
      0x10          VEML7700 light          0x39         APDS9960 gesture
@@ -34,15 +36,14 @@ struct Pair { int sda, scl; const char *note; };
 static const Pair PAIRS[] = {
   { -1, -1, "Wire.begin() default for this board" },
   {  3,  4, "Adafruit Feather ESP32-S3 (STEMMA QT)" },
-  { 16, 15, "Adafruit Reverse TFT Feather / our sketches" },
+  { 16, 15, "ES3C28P I2C socket (these sketches' board)" },
   {  8,  9, "ESP32-S3-DevKitC common default" },
   {  5,  6, "ESP32-S3 alternate" },
   {  1,  2, "ESP32-S3 alternate" },
   { 41, 40, "Adafruit QT Py ESP32-S3" },
   { 42, 41, "ESP32-S3 alternate" },
   { 17, 18, "ESP32 classic default" },
-  { 21, 22, "ESP32 classic / Uno-style" },
-  { 33, 34, "ESP32-S3 alternate" },
+  { 21, 22, "ESP32 classic default" },
   {  7,  6, "ESP32-S3 alternate" },
   { 11, 12, "ESP32-S3 alternate" },
   { 13, 14, "ESP32-S3 alternate" },
@@ -61,11 +62,13 @@ static const char *name_of(uint8_t a) {
     case 0x1C: case 0x1E: return "LIS3MDL magnetometer";
     case 0x6A: case 0x6B: return "LSM6DS accelerometer/gyro";
     case 0x3C: case 0x3D: return "SSD1306 / SH1107 display";
+    case 0x38: return "FT6336 touch controller (on the ES3C28P board itself)";
+    case 0x18: return "audio codec (on the ES3C28P board itself)";
     default: return 0;
   }
 }
 
-static int found_total = 0;
+static int found_total = 0, found_board = 0;
 
 static int scan_one(const Pair &p) {
   Wire.end();
@@ -87,6 +90,7 @@ static int scan_one(const Pair &p) {
         Serial.print(F("   -- ")); Serial.println(p.note);
       }
       n++;
+      if (p.sda == 16 && (a == 0x38 || a == 0x18)) found_board++;
       Serial.print(F("      0x"));
       if (a < 16) Serial.print('0');
       Serial.print(a, HEX);
@@ -130,12 +134,15 @@ void loop(void) {
   for (unsigned i = 0; i < sizeof PAIRS / sizeof *PAIRS; ++i) scan_one(PAIRS[i]);
 
   Serial.println();
-  if (!found_total) {
+  if (found_total && found_total == found_board) {
+    Serial.println(F("  ONLY THE BOARD'S OWN CHIPS ANSWERED (touch 0x38, codec 0x18)."));
+    Serial.println(F("  Your sensor is not answering. Check its four wires against"));
+    Serial.println(F("  PARTS.md: 3.3 V, ground, SDA to GPIO 16, SCL to GPIO 15."));
+  } else if (!found_total) {
     Serial.println(F("  NOTHING ANSWERED ON ANY PIN PAIR."));
     Serial.println(F("  That means the sensor is not powered or not connected."));
-    Serial.println(F("  Check the cable at BOTH ends -- STEMMA QT only fits one"));
-    Serial.println(F("  way, so if it is seated it is right. If you wired it by"));
-    Serial.println(F("  hand, check 3V and GND before you check anything else."));
+    Serial.println(F("  Check the cable at BOTH ends, and check 3.3 V and ground"));
+    Serial.println(F("  before you check anything else."));
   } else {
     Serial.print(F("  "));
     Serial.print(found_total);

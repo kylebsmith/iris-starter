@@ -37,7 +37,9 @@
 
    HARDWARE: a board and a BNO055 on I2C. Nothing else -- no knobs, no
    buttons, no screen. If you have no sensor at all, set USE_ANALOG to 1 and
-   it reads a potentiometer on A0 instead. Everything below that is identical.
+   it reads a potentiometer on ANALOG_PIN instead: GPIO 2 on the ES3C28P's
+   expansion socket (CHECK ON THE BOARD, see PARTS.md), A0 on other boards.
+   Everything below that is identical.
 
    WHAT IT LISTENS FOR
      SPACE     teach it: this pose means the point you last clicked
@@ -46,7 +48,12 @@
      c         clear everything
    ========================================================================= */
 
-#define USE_ANALOG 0        /* 1 = potentiometer on A0, no sensor needed */
+#define USE_ANALOG 0        /* 1 = potentiometer on ANALOG_PIN, no sensor needed */
+#if defined(ARDUINO_ARCH_ESP32)
+#define ANALOG_PIN 2        /* ES3C28P expansion socket; A0 there is the amplifier enable */
+#else
+#define ANALOG_PIN A0
+#endif
 
 #include <Wire.h>
 #if !USE_ANALOG
@@ -104,7 +111,7 @@ static float seen_lo =  1e30f, seen_hi = -1e30f;
    how hard you are squeezing something -- anything that moves. */
 static float read_input(void) {
 #if USE_ANALOG
-  return (float)analogRead(A0);
+  return (float)analogRead(ANALOG_PIN);
 #else
   imu::Vector<3> g = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
   return (float)g.x();                 /* one axis of tilt, roughly -9.8..+9.8 */
@@ -307,7 +314,7 @@ void setup(void) {
     }
     if (!found) {
       say("No BNO055 anywhere. Run i2c_find to see what is on the bus,");
-      say("or set USE_ANALOG to 1 at the top and use a knob on A0 instead.");
+      say("or set USE_ANALOG to 1 at the top and use a knob on ANALOG_PIN instead.");
       for (;;) delay(1000);
     } }
 #endif
@@ -323,7 +330,11 @@ void setup(void) {
      turns an invisible transformation into a visible, meaningful object: it is
      the part of the range the network has any evidence about. */
 #if USE_ANALOG
+#if defined(ARDUINO_ARCH_ESP32)
+  Serial.println(F("X 0 4095 counts"));
+#else
   Serial.println(F("X 0 1023 counts"));
+#endif
 #else
   Serial.println(F("X -9.81 9.81 m/s2"));   /* gravity, one axis */
 #endif
