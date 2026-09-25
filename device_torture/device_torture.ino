@@ -2,7 +2,7 @@
    ======================
    The library's tests run on a laptop. A laptop is not the machine it is
    for. This sketch runs the same kind of checks on the chip in your hand, and
-   it needs NO SENSOR and NO WIRING -- the data is synthetic and fixed, so the
+   it needs no sensor and no wiring -- the data is synthetic and fixed, so the
    only thing under test is the library and your board.
 
    It asks nine questions. The yes-or-no ones print PASS or FAIL with the
@@ -11,10 +11,10 @@
    tests that need its flash, heap counter or task stack print SKIP and count
    as neither.
 
-     1  does this chip produce the SAME instrument as the laptop, bit for bit
+     1  does this chip produce the same instrument as the laptop, bit for bit
      2  how much does the heap move across init, train and predict (a figure)
      3  does a saved instrument survive a real write to real flash
-     4  does a CORRUPTED file actually get refused, on this hardware
+     4  does a corrupted file actually get refused, on this hardware
      5  how long does iris_train take on this recipe, at four sizes (figures)
      6  how much stack is left at the deepest point
      7  do predictions drift over tens of thousands of calls
@@ -30,14 +30,15 @@
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-/* NO FUSED MULTIPLY-ADD IN THIS FILE. Test 1's demonstrations are computed
+/* No fused multiply-add in this file. Test 1's demonstrations are computed
    here, and 1.0f - (float)i * 0.03f is a multiply and a subtract, which GCC
    (the compiler the ESP32 board package uses) fuses into one instruction by
    default, rounding once instead of twice. The fused inputs differ in the
    last bit, so the chip would train on different numbers from the laptop
    and test 1 would fail for a reason that has nothing to do with the library
-   (measured on a laptop with GCC: 0x60E31823 instead of 0xB7FC47A0). iris.h switches fusing off for its own code only;
-   this switches it off for the rest of this file. */
+   (a laptop build with GCC and fusing on gives 0x60E31823 instead of
+   0xB7FC47A0). iris.h switches fusing off for its own code only; this
+   switches it off for the rest of this file. */
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize ("fp-contract=off")
 #elif defined(__clang__)
@@ -61,7 +62,7 @@ static Preferences store;
 
 /* The value this exact recipe produces on a laptop with iris 0.2.0, pinned in
    the library's tests/starter_recipes.c. If the chip disagrees, that is a
-   real finding about the chip or its compiler, not a broken test. Keep the
+   real result about the chip or its compiler, not a broken test. Keep the
    output and tell someone. */
 #define HOST_HASH 0xB7FC47A0u
 
@@ -141,7 +142,7 @@ static uint32_t hash_predictions(iris *k) {
 
 void setup(void) {
   Serial.begin(115200);
-  /* WAIT FOR THE PORT, do not guess at it with a delay. On a board with native
+  /* Wait for the port; do not guess at it with a delay. On a board with native
      USB the serial device does not exist until the computer opens it, and
      anything printed before that is gone for ever. */
   while (!Serial && millis() < 20000) delay(10);
@@ -174,7 +175,7 @@ void loop(void) {
   char buf[64], hx[9];
 
   /* ---- 1. determinism ---------------------------------------------------- */
-  /* The heap is sampled with NOTHING between the two reads but library calls,
+  /* The heap is sampled with nothing between the two reads but library calls,
      so printing and the USB stack's own allocations stay out of test 2. */
 #ifdef ARDUINO_ARCH_ESP32
   uint32_t heap_before = ESP.getFreeHeap();
@@ -193,7 +194,7 @@ void loop(void) {
   /* ---- 2. does it allocate ----------------------------------------------- */
 #ifdef ARDUINO_ARCH_ESP32
   { long d = (long)heap_before - (long)heap_after;
-    /* REPORTED, NOT JUDGED. This board runs an operating system and a USB
+    /* Reported, not judged. This board runs an operating system and a USB
        stack that allocate on their own schedule, so a heap delta measured
        across any span of time measures them as well as this library. The
        proof that iris never allocates is its symbol table: built
@@ -207,7 +208,7 @@ void loop(void) {
   skip("2 heap delta", "needs the ESP32 heap counter");
 #endif
 
-  /* ---- 3. save / load through REAL flash ---------------------------------- */
+  /* ---- 3. save / load through real flash ---------------------------------- */
   size_t n = iris_save(k, blob, sizeof blob);
 #ifdef ARDUINO_ARCH_ESP32
   if (n) {
@@ -227,7 +228,7 @@ void loop(void) {
   skip("3 survives real flash", "needs the ESP32 flash store");
 #endif
 
-  /* ---- 4. corruption is refused, ON THIS HARDWARE ------------------------- */
+  /* ---- 4. corruption is refused, on this hardware ------------------------- */
   { static unsigned char scratch[sizeof blob];
     static unsigned char probe[IRIS_ARENA(NI, NH, NO, CAP)];
     long refused = 0, accepted = 0;

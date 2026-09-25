@@ -3,7 +3,7 @@
    Pose the board, set the three knobs to the sound you want, press SAVE.
    Two saves and it starts playing.
 
-   THIS IS THE PORTABLE ONE, and that is the whole reason it exists.
+   This is the portable one, and that is the whole reason it exists.
    boilerplate/stemma_bno055 is the same instrument with more in it -- it saves
    what you taught it to flash, so the instrument survives a reboot -- but
    Preferences.h and Wire.begin(SDA, SCL) are Espressif calls, so that file
@@ -13,7 +13,7 @@
    ========================================================================= */
 #include <Wire.h>
 #include <Adafruit_BNO055.h>
-/* NOT FOR AN 8-BIT AVR (the Uno's chip family). The Adafruit BNO055 driver
+/* Not for an 8-bit AVR (the Uno's chip family). The Adafruit BNO055 driver
    plus this sketch's globals leave 79 bytes of stack on an Uno, and the
    training step's frame alone is 284 (iris.h, the note above IRIS_MAX_IN).
    It would compile, flash, and then corrupt memory the first time you
@@ -84,10 +84,10 @@ void setup() {
      demonstration records the same input, training succeeds, the status stays
      0, and the instrument plays one frozen number for ever. Nothing anywhere
      says the sensor is missing. Stop instead. */
-  /* Try the other address before giving up. The ADR (address-select) pad on the back of the
-     Adafruit board moves it from 0x28 to 0x29, boards ship both ways, and the
-     failure message below names both -- so it has to actually try both, or it
-     sends someone to reseat a cable that was never the problem. */
+  /* Try the other address before giving up. The ADR (address-select) pad
+     on the back of the Adafruit board moves it from 0x28 to 0x29, boards ship
+     both ways, and the failure message below names both -- so it has to try
+     both, or it sends someone to reseat a cable that was never the problem. */
   if (!bno.begin()) {
     bno = Adafruit_BNO055(55, 0x29, &Wire);
   }
@@ -136,7 +136,7 @@ void loop() {
     out[0] = analogRead(POT_A) / ADC_MAX;
     out[1] = analogRead(POT_B) / ADC_MAX;
     out[2] = analogRead(POT_C) / ADC_MAX;
-    /* Ask WHY it refused -- see stemma_bno055. "full" is only one of three
+    /* Ask why it refused -- see stemma_bno055. "full" is only one of three
        reasons, and it is the least likely one on a fresh board. */
     if (!iris_record(k, in, out)) {
       if (iris_get_status(k) == IRIS_STORE_FULL)
@@ -146,7 +146,7 @@ void loop() {
                          "Check the wiring."));
     }
     else {
-      /* SAY SO ON EVERY SUCCESSFUL RECORD, not only on failure. A first
+      /* Say so on every successful record, not only on failure. A first
          press that prints nothing teaches a student that the button does
          nothing, so a successful save is as loud as a failed one. */
       ++demos;

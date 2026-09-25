@@ -30,6 +30,7 @@
      Flash Size          16MB (128Mb)
      PSRAM               OPI PSRAM
      Partition Scheme    16M Flash (3MB APP/9.9MB FATFS)
+     Upload Mode         USB-OTG CDC (TinyUSB)
 
    IF THE BOARD STOPS ACCEPTING UPLOADS
      Send 'R' over Serial, or CC 123 value 127 on MIDI channel 16. Either one
@@ -42,7 +43,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
 #include <Adafruit_BNO055.h>
-/* The board settings that fail SILENTLY if you get them wrong: the wrong
+/* The board settings that fail silently if you get them wrong: the wrong
    USB Mode compiles fine and then the board never appears as a MIDI device,
    and USB CDC On Boot off (CDC, Communications Device Class, is the USB
    serial-port standard) gives you a board that runs but cannot talk to you.
@@ -67,8 +68,8 @@
 
 
 /* ===========================================================================
-   YOUR BUILD — everything below is true of MY hardware, not of hardware in
-   general. If you change the board, the panel, or how the sensor is mounted,
+   YOUR BUILD — everything below is true of the hardware this sketch was
+   written on, not of hardware in general. If you change the board, the panel, or how the sensor is mounted,
    this is the only block you should need to touch.
    =========================================================================== */
 
@@ -87,8 +88,9 @@
 #define SCL_PIN   15
 #define TOUCH_ADDR 0x38
 
-/* The BNO055 answers at 0x28, or 0x29 if the ADR (address-select) pad on the breakout is
-   bridged. We try both rather than telling you the cable is loose. */
+/* The BNO055 answers at 0x28, or 0x29 if the ADR (address-select) pad on
+   the breakout is bridged. The sketch tries both rather than telling you the
+   cable is loose. */
 #define BNO_ADDR_A 0x28
 #define BNO_ADDR_B 0x29
 
@@ -104,8 +106,9 @@
 
 /* WHICH WAY IS TILT? Gravity is a 3-vector pointing down through the board.
    Which two components mean "roll" and "pitch" depends entirely on how your
-   sensor is glued down. Mine reads x and y. If your instrument responds to the
-   wrong movement, swap these before you change anything else.
+   sensor is glued down. This sketch reads x and y. If your instrument
+   responds to the wrong movement, swap these before you change anything
+   else.
 
    You do NOT need to correct for a sensor that sits slightly off level. iris
    fits its input range to the demonstrations you actually give it, so a tilted
@@ -146,14 +149,14 @@ USBMIDI MIDI;
 
 /* iris needs one block of memory and never asks for more. IRIS_ARENA works out
    how big at compile time from the same four numbers passed to iris_init, so
-   if you change the shape, change it in BOTH places or the arena will be too
+   if you change the shape, change it in both places or the arena will be too
    small and iris_init will refuse. */
 #define N_IN  2
 #define N_HID 12
 static unsigned char arena[IRIS_ARENA(N_IN, N_HID, NOUT, MAXEX)];
 static iris *k;
 
-static int  value[NOUT] = { 64, 64, 64 };  /* the CCs in force RIGHT NOW */
+static int  value[NOUT] = { 64, 64, 64 };  /* the CCs in force now */
 static int  drawn[NOUT] = { -1, -1, -1 };  /* what is currently drawn on the screen */
 static int  demos   = 0;
 static bool editing = true;                /* setting a sound, not playing */
@@ -162,8 +165,7 @@ static bool editing = true;                /* setting a sound, not playing */
    Gravity, not Euler angles. Euler angles wrap: somewhere in the rotation they
    step from +180 to -180, so two poses one degree apart read as opposite ends
    of the range. Nothing smooth can fit that, and the sound falls off a cliff
-   right there. Measured on this mapping, crossing the wrap makes the worst
-   one-degree step 5x steeper. Gravity just points down and never wraps.
+   right there. Gravity just points down and never wraps.
 
    No scaling either. iris normalises each input from your demonstrations, so
    raw metres per second squared works exactly as well as anything you divide
@@ -259,7 +261,7 @@ static void reboot_to_bootloader() {
   usb_persist_restart(RESTART_BOOTLOADER);
 }
 
-/* A failure goes to the screen AND to Serial Monitor, repeated every two
+/* A failure goes to the screen and to Serial Monitor, repeated every two
    seconds so a monitor opened late still sees it: a dead screen must not
    leave the board silent. Each line fits the panel at text size 2 (19
    characters from x = 10). 'R' still restarts into the bootloader. */

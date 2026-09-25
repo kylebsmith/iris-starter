@@ -1,5 +1,5 @@
-/* WHERE IS MY SENSOR?
-   ===================
+/* i2c_find — where is my sensor?
+   ===============================
    Every ESP32 board puts I2C (inter-integrated circuit, the two-wire bus
    sensors talk on) on different pins, and a STEMMA QT cable plugged
    into a board whose pins you guessed wrong looks exactly like a broken sensor:

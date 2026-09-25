@@ -2,7 +2,7 @@
    ===================================================
    The same instrument as boilerplate/any_sensor, wired to a real sensor
    instead of analogue pins. Shown with the BNO055 orientation board because
-   that is what is in the kit, but the SHAPE is what to copy: every STEMMA QT
+   that is what is in the kit, but the shape is what to copy: every STEMMA QT
    board is the same four steps.
 
    WIRING: the sensor goes on the board's I2C socket (I2C, inter-integrated
@@ -19,7 +19,7 @@
    Pose the board. Turn the knobs until it sounds right. Tap SAVE.
    Twice, and it plays.
 
-   AND IT SURVIVES BEING UNPLUGGED. The SAVE button does two things:
+   It survives being unplugged. The SAVE button does two things:
 
      tap  (let go within a second)  records one demonstration: the pose and
                                     the knobs as they were when you pressed,
@@ -40,7 +40,7 @@
    (iris_save and iris_load) out of when you want an instrument to outlive the
    cable.
 
-   THIS FILE NEEDS AN ESP32. Two things in it are Espressif-only: Preferences.h,
+   This file needs an ESP32. Two things in it are Espressif-only: Preferences.h,
    which is how this chip writes to its own flash, and Wire.begin(SDA, SCL),
    which takes pin numbers here and takes none on an Uno or a Pico. Everything
    else, iris.h included, runs anywhere -- boilerplate/any_sensor is the version
@@ -92,7 +92,7 @@ static Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
 static Preferences store;
 
 /* ---- 2. READ THE SENSOR -------------------------------------------------
-   GRAVITY, not orientation in degrees. Euler angles wrap from +180 to -180,
+   Gravity, not orientation in degrees. Euler angles wrap from +180 to -180,
    so two poses a degree apart arrive at opposite ends of the range and the
    sound falls off a cliff there. Gravity points down and never wraps.
    No scaling: raw metres per second squared is exactly what iris wants. */
@@ -125,7 +125,7 @@ static unsigned char memory[IRIS_ARENA(N_INPUTS, 12, N_OUTPUTS, N_DEMOS)];
 static unsigned char saved[sizeof memory];
 static iris *k;
 
-/* TRAINING IN SLICES, so the instrument never goes deaf. iris_train() blocks
+/* Training in slices, so the instrument never goes deaf. iris_train() blocks
    for seconds at eight or more demonstrations on this board (device_torture
    test 5 measures it), and an instrument that stops responding for seconds
    after every take is not an instrument. iris_train_begin + iris_train_slice
@@ -159,10 +159,10 @@ void setup() {
   pinMode(SAVE_BTN, INPUT_PULLUP);
 
   Wire.begin(SDA_PIN, SCL_PIN);
-  /* Try the other address before giving up. The ADR (address-select) pad on the back of the
-     Adafruit board moves it from 0x28 to 0x29, boards ship both ways, and the
-     failure message below names both -- so it has to actually try both, or it
-     sends someone to reseat a cable that was never the problem. */
+  /* Try the other address before giving up. The ADR (address-select) pad
+     on the back of the Adafruit board moves it from 0x28 to 0x29, boards ship
+     both ways, and the failure message below names both -- so it has to try
+     both, or it sends someone to reseat a cable that was never the problem. */
   if (!bno.begin()) {
     bno = Adafruit_BNO055(55, 0x29, &Wire);
   }
@@ -203,9 +203,9 @@ void setup() {
   if (!iris_is_trained(k) && iris_count(k) >= 2) start_training();
 }
 
-/* A TAP: store the demonstration read when the button went down. */
+/* A tap: store the demonstration read when the button went down. */
 static void record_take(const float *in, const float *out) {
-  /* Ask WHY it refused. There are three reasons and they need three
+  /* Ask why it refused. There are three reasons and they need three
      different fixes; printing "full" for all of them sends a student to
      delete demonstrations they may not even have. */
   if (!iris_record(k, in, out)) {
@@ -219,7 +219,7 @@ static void record_take(const float *in, const float *out) {
   Serial.print(F("demonstrations: ")); Serial.println(iris_count(k));
 }
 
-/* A HOLD: save the instrument being played. A run still in progress is
+/* A hold: save the instrument being played. A run still in progress is
    finished first, so the file holds the trained network, never a half-trained
    one. Nothing is recorded, so nothing is retrained. */
 static void keep_instrument(void) {

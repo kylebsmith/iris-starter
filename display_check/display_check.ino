@@ -3,7 +3,7 @@
    you already know whether the panel and the touch controller are good. */
 
 #include <SPI.h>
-/* THIS SKETCH IS FOR ONE BOARD: the ES3C28P (LCDWIKI's 2.8-inch ESP32-S3
+/* This sketch is for one board: the ES3C28P (LCDWIKI's 2.8-inch ESP32-S3
    display board). It drives that board's TFT (thin-film transistor) screen,
    an ILI9341 at 240 x 320, over SPI (serial peripheral interface, the fast
    four-wire bus screens use) on its fixed pins, and talks to its FT6336
@@ -16,8 +16,8 @@
    the ESP32-S3 board entry, and Serial reaches the computer through the
    chip's own USB (Universal Serial Bus) port only with USB CDC On Boot
    enabled (CDC: Communications Device Class, the USB serial-port standard).
-   Either USB Mode works: this sketch uses nothing from the USB-OTG mode's
-   TinyUSB software. */
+   Either USB Mode works: this sketch uses nothing from the USB-OTG
+   (On-The-Go) mode's TinyUSB software. */
 #if defined(ARDUINO_ARCH_ESP32) && !defined(CONFIG_IDF_TARGET_ESP32S3)
 #error "This sketch is for the ESP32-S3 display board. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module, then set the board options in GET-STARTED.md."
 #endif

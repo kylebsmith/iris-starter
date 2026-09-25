@@ -197,7 +197,7 @@ void loop() {
     held = 0;
     if (recorded < 3) {
       float target = TARGETS[recorded] / 127.0f;         /* keep MIDI in 0..1 */
-      /* Count what the library ACCEPTED, not what we offered it. A counter
+      /* Count what the library accepted, not what was offered to it. A counter
          bumped for a refused reading would say "recorded 3" while the
          instrument held 2, trained on 2 and played a smooth, plausible
          number without mentioning it. */

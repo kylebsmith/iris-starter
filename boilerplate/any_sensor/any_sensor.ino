@@ -12,7 +12,7 @@
    it builds for an Arduino Uno, a Nano Every, both Raspberry Pi Pico cores
    and the ESP32-S3.
    ========================================================================= */
-/* ON A SMALL BOARD THE WORKING ARRAYS ARE THE STACK BUDGET.
+/* On a small board the working arrays are the stack budget.
    iris.h sizes its working arrays from these maxima rather than from the
    shape you asked for, so with the defaults (32 inputs, 16 outputs, 64
    hidden units) the training step alone reserves 192 bytes of stack for an
@@ -29,14 +29,16 @@
 #define IRIS_MAX_OUT 4
 #define IRIS_MAX_HID 12
 #endif
-/* AND THE OPPOSITE, IF YOUR BOARD IS A MODERN ONE. None of the four lines
+/* And the opposite, if your board is a modern one. None of the four lines
    above happen unless you are compiling for an 8-bit AVR (the chip family of
    the Uno and the Nano Every), so on an ESP32, a
    Pico, an STM32 or a Teensy the library's own ceilings apply instead: 32
    inputs, 16 outputs, 64 hidden units. The 2 / 3 / 16 you are about to read is
    a starting point, not a limit, and on a modern board you are nowhere near
-   one. Measured, this same file, unchanged: on an ESP32-S3 it uses 13% of
-   memory and leaves 281,952 bytes free; on an Uno it uses 81% and leaves 371.
+   one. The compiler's report for this file, unchanged (esp32 board package
+   3.3.3 with the settings in GET-STARTED.md; Arduino AVR Boards 1.8.7 for the
+   Uno): on an ESP32-S3 it uses 13% of memory and leaves 281,952 bytes free;
+   on an Uno it uses 81% and leaves 371.
    So if you have the newer board, raising N_INPUTS for a sensor with more axes
    -- or N_DEMOS because you want to teach it a longer piece -- costs you
    nothing you will notice. Raise the three ceilings above with it if you go
@@ -139,8 +141,9 @@ static void send_sound(const float *out) {
    ========================================================================= */
 
 /* If POT_PIN does not have exactly N_OUTPUTS entries, this line fails to
-   compile with the name of the problem in the error. Better than discovering
-   at three in the morning that knob four reads pin zero. */
+   compile with the name of the problem in the error. Without it, a missing
+   entry is read from past the end of the array, and that knob reads whatever
+   pin number happens to be there. */
 typedef char POT_PIN_must_have_exactly_N_OUTPUTS_entries
              [(sizeof POT_PIN / sizeof POT_PIN[0]) == N_OUTPUTS ? 1 : -1];
 
@@ -157,8 +160,8 @@ void setup() {
 
   k = iris_init(memory, sizeof memory, N_INPUTS, 12, N_OUTPUTS, N_DEMOS, 1234);
   if (!k) {
-    /* iris_init returns 0 for a bad SHAPE as well as for a small arena, and
-       naming only the arena sent students to check the one thing that was
+    /* iris_init returns 0 for a bad shape as well as for a small arena, and
+       naming only the arena would send you to check the one thing that is
        right. iris_size() separates them: it returns 0 when the shape itself
        cannot be sized, and otherwise tells you exactly how many bytes the
        shape needs, which you can compare against what you gave it. */
@@ -179,7 +182,7 @@ void setup() {
      means uninitialised memory is recorded as a demonstration and played back
      as sound, and nothing ever says so.
 
-     The probe arrays are deliberately OVERSIZED. Lower a count and leave an
+     The probe arrays are deliberately oversized. Lower a count and leave an
      extra line in the function, and an exactly sized array would be written
      past its end by the very check meant to catch that mistake. The slack
      means the overrun lands in spare space we own and is then reported
@@ -188,7 +191,7 @@ void setup() {
     int in_unset[N_INPUTS + 4], t_unset[N_OUTPUTS + 4];
     int i, pass;
 
-    /* TWO sentinels, not one. With a single magic number, a sensor that
+    /* Two sentinels, not one. With a single magic number, a sensor that
        legitimately returns exactly that value would be accused of never
        setting an input it sets on every call. A slot is only genuinely
        unwritten if it still holds sentinel A after a pass seeded with A *and*
@@ -230,7 +233,7 @@ void setup() {
         for(;;);
       } }
 
-  /* ---- IS THE SENSOR ACTUALLY THERE? ------------------------------------
+  /* ---- is the sensor actually there? ------------------------------------
      This is the most common hardware fault there is, and the hardest to see.
      A disconnected I2C sensor (I2C, inter-integrated circuit, is the two-wire
      bus most sensor boards use) does not report an error and does not return a
@@ -238,8 +241,8 @@ void setup() {
      value, or a rated maximum. Every one of those is a perfectly valid float.
      It records, it trains, it plays -- one frozen note, for ever, with the
      status reading healthy.
-     We cannot know what YOUR sensor returns when it is missing. But we know
-     what a dead bus looks like from here: a reading that does not move at all,
+     This sketch cannot know what your sensor returns when it is missing, but
+     it knows what a dead bus looks like from here: a reading that does not move at all,
      not in the last bit, over a third of a second. Real sensors dither. This
      warns rather than halts, because a genuinely static input (a switch, a
      knob you are not touching) is legitimate -- it just should not surprise
@@ -263,7 +266,7 @@ void setup() {
   Serial.println(F("send 'd' to delete the last demonstration, 'c' to clear."));
 }
 
-/* ---- TRAINING WITHOUT GOING DEAF ---------------------------------------
+/* ---- training without going deaf ---------------------------------------
    iris_train() does the whole fit in one call and does not return until it is
    finished: on an ESP32-S3 that is seconds at eight or more demonstrations
    (device_torture test 5 measures it on your board). For those seconds the
@@ -272,7 +275,7 @@ void setup() {
 
    iris_train_begin / iris_train_slice do exactly the same fit in pieces:
    iris_train_begin starts from the instrument's seed as iris_train does, and
-   the result is BIT-IDENTICAL to iris_train whatever the slice size, with a
+   the result is bit-identical to iris_train whatever the slice size, with a
    prediction between every slice, which is what this sketch does. So the
    instrument keeps playing while it learns, and you can hear it improve. */
 static bool training = false;
@@ -294,7 +297,7 @@ static void keep_training(void) {
   iris_train_slice(k, 64);           /* a few milliseconds of work */
   if (iris_train_busy(k)) return;
   training = false;
-  /* CHECK THE ANSWER. A finished run is not the same as a successful one:
+  /* Check the answer. A finished run is not the same as a successful one:
      iris_is_trained is correct after every trainer in the library. */
   if (iris_is_trained(k)) {
     Serial.print(F("trained in ")); Serial.print(millis() - train_started);
@@ -332,7 +335,7 @@ void loop() {
     delay(300);                            /* crude, but it debounces */
   }
 
-  /* THE REPAIR LOOP. A bad demonstration is not a disaster you re-flash your
+  /* The repair loop. A bad demonstration is not a disaster you re-flash your
      way out of -- you delete it and demonstrate again. That loop is the whole
      argument for learning by showing, so the sketch that teaches the library
      has to expose it. Without this, one stuck button fills the store and a

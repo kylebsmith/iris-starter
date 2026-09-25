@@ -2,15 +2,15 @@
    ===========================
    The library's central promise is that the same seed and the same
    demonstrations produce the same instrument, bit for bit, so a mapping you
-   save today plays the same on another board and in ten years.
+   save plays the same on every board that passes this check.
 
    This sketch runs one fixed recipe, hashes what the trained instrument
    plays and the file it saves, and compares both numbers with the values a
    laptop computes for the same recipe. It prints PASS when the chip matches
-   the laptop and FAIL when it does not. A FAIL is a real finding about the
+   the laptop and FAIL when it does not. A FAIL is a real result about the
    chip or its compiler: keep the whole printout.
 
-   THE RECIPE: iris_init with seed 1234, 20 fixed demonstrations, then
+   The recipe: iris_init with seed 1234, 20 fixed demonstrations, then
    iris_reseed(k, 1234) and iris_continue(k, 800) -- exactly 800 training
    passes from the seed's starting weights. (iris_train would stop wherever
    the error levels off; a fixed count keeps the recipe identical to the one
@@ -23,20 +23,21 @@
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-/* NO FUSED MULTIPLY-ADD IN THIS FILE. The demonstrations below are computed
+/* No fused multiply-add in this file. The demonstrations below are computed
    here, and 0.25f + 0.5f * u is a multiply and an add, which GCC (the
    compiler the ESP32 board package uses) fuses into one instruction by
    default, rounding once instead of twice. A fused result can differ in the
-   last bit, and then the chip trains on different numbers from the laptop. iris.h switches fusing off for its own code only; this
-   switches it off for the rest of this file, so the recipe stays comparable
-   whatever you change in it. */
+   last bit, and then the chip trains on different numbers from the laptop.
+   iris.h switches fusing off for its own code only; this switches it off for
+   the rest of this file, so the recipe stays comparable whatever you change
+   in it. */
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC optimize ("fp-contract=off")
 #elif defined(__clang__)
 #pragma STDC FP_CONTRACT OFF
 #endif
 
-/* THE LAPTOP'S VALUES for this recipe with iris 0.2.0. PREDICTION_HASH is
+/* The laptop's values for this recipe with iris 0.2.0. PREDICTION_HASH is
    pinned in the library's tests/starter_recipes.c. FILE_HASH is the same
    recipe's saved file (format 7, 872 bytes), computed by a laptop build of
    this sketch. */

@@ -1,8 +1,8 @@
-/* BOARD PROBE -- how fast iris runs on this board, measured properly
-   ==================================================================
+/* board_probe -- how fast iris runs on this board
+   ===============================================
    One sketch that measures what the documents quote about speed, prints
    every figure with its unit, and ends with one block you can paste into a
-   lab notebook or a research record whole. It needs NO SENSOR and NO WIRING.
+   lab notebook or a research record whole. It needs no sensor and no wiring.
 
    What it measures, in order:
 
@@ -11,7 +11,7 @@
      1  three pinned recipes, compared bit for bit with the laptop's values:
         the library's golden recipe (tests/audit.c), device_torture test 1
         and determinism_check. PASS or FAIL each.
-     2  the time of ONE prediction, iris_predict, at three shapes (2 inputs,
+     2  the time of one prediction, iris_predict, at three shapes (2 inputs,
         12 hidden units, 3 outputs; 6/16/8; 12/32/8):
           - with the processor's cycle counter, which counts every clock tick
             (4.2 ns at 240 MHz), not micros(), which counts whole
@@ -40,7 +40,7 @@
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-/* NO FUSED MULTIPLY-ADD IN THIS FILE. Section 1 computes the pinned recipes'
+/* No fused multiply-add in this file. Section 1 computes the pinned recipes'
    demonstrations here, and GCC (the compiler the ESP32 board package uses)
    fuses a multiply and an add into one instruction by default, which rounds
    once instead of twice and can move the last bit. iris.h switches fusing
@@ -56,7 +56,7 @@
    it needs the ESP32-S3 board entry; Serial reaches the computer through the
    chip's own USB port only with USB CDC On Boot enabled (CDC: Communications
    Device Class, the USB serial-port standard). Either USB Mode works: this
-   sketch uses nothing from the USB-OTG mode's TinyUSB software. */
+   sketch uses nothing from the USB-OTG (On-The-Go) mode's TinyUSB software. */
 #if !defined(ARDUINO_ARCH_ESP32) || !defined(CONFIG_IDF_TARGET_ESP32S3)
 #error "board_probe times an ESP32-S3 with its cycle counter. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module, then set the board options in GET-STARTED.md."
 #endif
