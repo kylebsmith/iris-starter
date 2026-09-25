@@ -11,10 +11,3 @@ processing/*/application.*
 
 # macOS
 .DS_Store
-
-# Assistant/tool scratch files. Kept locally, never published: anything a
-# contributor needs lives in the library repository's CONTRIBUTING.md.
-CLAUDE.md
-AGENTS.md
-.claude/
-.cursor/
