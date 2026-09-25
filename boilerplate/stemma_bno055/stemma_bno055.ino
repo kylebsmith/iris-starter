@@ -49,6 +49,15 @@
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
+   USB port, as on the ES3C28P, Serial reaches the computer only with USB
+   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
+   so every other board builds untouched. Either USB Mode works: this sketch
+   uses no feature of the TinyUSB mode. */
+#if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
+#error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
+#endif
+
 /* ---- 1. THE SHAPE ------------------------------------------------------- */
 #define N_INPUTS   2        /* two axes of tilt. Use 3 to add the third. */
 #define N_OUTPUTS  3

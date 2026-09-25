@@ -10,19 +10,15 @@
    boilerplate/any_sensor for the version that does.  */
 #include <Wire.h>
 
-/* The two settings that make Serial Monitor stay empty for ever. This is the
-   sketch you were sent to when nothing else worked, so it is the last one that
-   should reproduce the fault it is meant to diagnose.
-   Wrapped in ARDUINO_ARCH_ESP32 on purpose: on AVR and RP2040 these macros do
-   not exist, and an unwrapped `#if !ARDUINO_USB_CDC_ON_BOOT` reads undefined
-   as 0 and fires the error on every board that never had the problem. */
-#ifdef ARDUINO_ARCH_ESP32
-#if ARDUINO_USB_MODE
-#error "Wrong USB Mode. Set Tools -> USB Mode -> 'USB-OTG (TinyUSB)'. Every sketch in this repo uses that one setting."
+/* BOARD SETTINGS. This sketch drives the ES3C28P's own pins, so it needs
+   the ESP32-S3 board entry, and Serial reaches the computer through the
+   chip's own USB port only with USB CDC On Boot enabled. Either USB Mode
+   works: this sketch uses no feature of the TinyUSB mode. */
+#if defined(ARDUINO_ARCH_ESP32) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+#error "This sketch is for the ESP32-S3 display board. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module, then set the board options in GET-STARTED.md."
 #endif
-#if !ARDUINO_USB_CDC_ON_BOOT
-#error "Set Tools -> USB CDC On Boot -> 'Enabled', or Serial Monitor will stay empty forever and nothing will tell you why."
-#endif
+#if defined(CONFIG_IDF_TARGET_ESP32S3) && !ARDUINO_USB_CDC_ON_BOOT
+#error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
 
 #include <Adafruit_GFX.h>

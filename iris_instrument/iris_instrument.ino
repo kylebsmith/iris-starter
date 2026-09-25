@@ -34,6 +34,20 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
 #include <Adafruit_BNO055.h>
+/* The board settings that fail SILENTLY if you get them wrong: the wrong
+   USB Mode compiles fine and then the board never appears as a MIDI device,
+   and CDC off gives you a board that runs but cannot talk to you. Neither
+   produces an error on its own, so here is the error. These come before the
+   USB includes, which do not exist for other boards. */
+#if defined(ARDUINO_ARCH_ESP32) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+#error "This sketch is for the ESP32-S3 display board. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module, then set the board options in GET-STARTED.md."
+#endif
+#if ARDUINO_USB_MODE
+#error "Set Tools -> USB Mode -> USB-OTG (TinyUSB). This sketch appears to the computer as a USB MIDI instrument, and only the TinyUSB mode can do that: in Hardware CDC and JTAG mode the board runs but no MIDI device appears."
+#endif
+#if defined(CONFIG_IDF_TARGET_ESP32S3) && !ARDUINO_USB_CDC_ON_BOOT
+#error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
+#endif
 #include <USB.h>
 #include <USBMIDI.h>
 #include "esp32-hal-tinyusb.h"
@@ -42,16 +56,6 @@
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-/* The two board settings that fail SILENTLY if you get them wrong: the wrong
-   USB Mode compiles fine and then the board simply never appears as a MIDI
-   device, and CDC off gives you a board that runs but cannot talk to you.
-   Neither produces an error on its own, so here is the error. */
-#if ARDUINO_USB_MODE
-#error "Wrong USB Mode. Set Tools -> USB Mode -> 'USB-OTG (TinyUSB)'. Without it the board runs but never enumerates as a MIDI device, which is why this stops the build instead of letting you find out later."
-#endif
-#if !ARDUINO_USB_CDC_ON_BOOT
-#error "Set Tools -> USB CDC On Boot -> 'Enabled', or Serial Monitor will stay empty forever and nothing will tell you why."
-#endif
 
 /* ===========================================================================
    YOUR BUILD — everything below is true of MY hardware, not of hardware in

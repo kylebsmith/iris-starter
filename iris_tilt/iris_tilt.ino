@@ -31,30 +31,53 @@
      BOOT. Build an escape hatch into anything you write before you flash it,
      not after.
 
+   USB MODE: either works. In USB-OTG (TinyUSB) mode 'R' uses the core's
+   usb_persist_restart. In Hardware CDC and JTAG mode it sets the chip's
+   force-download flag and restarts, which the chip's built-in loader reads
+   at boot; that path is not yet tested on the board.
+
    WHY THIS PRINTS INSTEAD OF SENDING MIDI
-     A USB-MIDI build on this board needs different USB settings, and getting
-     them wrong bricks enumeration until you unplug it. I lost a day to that.
-     So we prove the learning works first, on the safe USB config. MIDI is the
-     next sketch and it carries an escape hatch. Keep that order.
+     Printing proves the learning works with nothing between the network and
+     your eyes. iris_instrument is the next step: it sends MIDI (Musical
+     Instrument Digital Interface, the standard message format synthesisers
+     understand) over USB, which needs the TinyUSB mode.
    --------------------------------------------------------------------------- */
 
 #include <Wire.h>
 #include <Adafruit_BNO055.h>
-#include "esp32-hal-tinyusb.h"
+/* BOARD SETTINGS. This sketch uses the ES3C28P's pins, so it needs the
+   ESP32-S3 board entry; Serial reaches the computer through the chip's own
+   USB port only with USB CDC On Boot enabled. */
+#if defined(ARDUINO_ARCH_ESP32) && !defined(CONFIG_IDF_TARGET_ESP32S3)
+#error "This sketch is for the ESP32-S3 display board. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module, then set the board options in GET-STARTED.md."
+#endif
+#if defined(CONFIG_IDF_TARGET_ESP32S3) && !ARDUINO_USB_CDC_ON_BOOT
+#error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
+#endif
+#if ARDUINO_USB_MODE
+#include "soc/rtc_cntl_reg.h"   /* Hardware CDC and JTAG: the force-download flag */
+#else
+#include "esp32-hal-tinyusb.h"  /* USB-OTG (TinyUSB): usb_persist_restart */
+#endif
 #include "iris.h"
 #if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-/* Both of these settings fail silently when wrong: CDC off gives a board that
-   runs and cannot talk to you, and the wrong USB Mode leaves the 'R' escape
-   hatch without a bootloader to restart into. So here is the error instead. */
+/* 'R': restart into the chip's built-in loader, ready for an upload. */
+static void restart_into_bootloader(void) {
+  Serial.println("restarting into the bootloader -- upload now.");
+  Serial.flush();
+  delay(100);
 #if ARDUINO_USB_MODE
-#error "Wrong USB Mode. Set Tools -> USB Mode -> 'USB-OTG (TinyUSB)'. Every sketch in this repo uses that one setting."
+  /* Hardware CDC and JTAG mode: the flag makes the next boot enter download
+     mode over the same USB port. Needs a test on the board. */
+  REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+  esp_restart();
+#else
+  usb_persist_restart(RESTART_BOOTLOADER);
 #endif
-#if !ARDUINO_USB_CDC_ON_BOOT
-#error "Set Tools -> USB CDC On Boot -> 'Enabled', or Serial Monitor will stay empty forever and nothing will tell you why."
-#endif
+}
 
 /* The board's touch controller and audio codec already live on this bus.
    Your sensor joins them. */
@@ -137,7 +160,7 @@ void loop() {
     int ch = Serial.read();
     /* 'R' is reserved: it is the way back into the bootloader when the board
        is in an enclosure and BOOT is unreachable. */
-    if (ch == 'R')                   usb_persist_restart(RESTART_BOOTLOADER);
+    if (ch == 'R')                   restart_into_bootloader();
     else if (ch == 'c' || ch == 'C') serial_clear = true;
     else if (ch > ' ')               serial_rec = true;
   }

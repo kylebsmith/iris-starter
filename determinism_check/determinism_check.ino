@@ -44,19 +44,13 @@
 #define HOST_FILE_HASH       0xD8666A69u
 #define HOST_FILE_BYTES      872u
 
-/* The two settings that make Serial Monitor stay empty for ever. This is the
-   sketch you were sent to when nothing else worked, so it is the last one that
-   should reproduce the fault it is meant to diagnose.
-   Wrapped in ARDUINO_ARCH_ESP32 on purpose: on AVR and RP2040 these macros do
-   not exist, and an unwrapped `#if !ARDUINO_USB_CDC_ON_BOOT` reads undefined
-   as 0 and fires the error on every board that never had the problem. */
-#ifdef ARDUINO_ARCH_ESP32
-#if ARDUINO_USB_MODE
-#error "Wrong USB Mode. Set Tools -> USB Mode -> 'USB-OTG (TinyUSB)'. Every sketch in this repo uses that one setting."
-#endif
-#if !ARDUINO_USB_CDC_ON_BOOT
-#error "Set Tools -> USB CDC On Boot -> 'Enabled', or Serial Monitor will stay empty forever and nothing will tell you why."
-#endif
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
+   USB port, as on the ES3C28P, Serial reaches the computer only with USB
+   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
+   so every other board builds untouched. Either USB Mode works: this sketch
+   uses no feature of the TinyUSB mode. */
+#if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
+#error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
 
 

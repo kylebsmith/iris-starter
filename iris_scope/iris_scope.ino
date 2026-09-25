@@ -57,18 +57,13 @@
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-#ifdef ARDUINO_ARCH_ESP32
-#if !ARDUINO_USB_CDC_ON_BOOT
-#error "Set Tools -> USB CDC On Boot -> 'Enabled', or the plot will never receive anything."
-#endif
-/* And the OTHER setting. This sketch checked CDC On Boot and not USB Mode, so
-   a student with USB Mode wrong got a clean build and a silent board -- from
-   the first sketch GET-STARTED.md tells them to run, on the same page that
-   promises the build will refuse. A guard that covers one of the two settings
-   that can produce a dead board is not a guard against a dead board. */
-#if ARDUINO_USB_MODE
-#error "Wrong USB Mode. Set Tools -> USB Mode -> 'USB-OTG (TinyUSB)'. Every sketch in this repo uses that one setting."
-#endif
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
+   USB port, as on the ES3C28P, Serial reaches the computer only with USB
+   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
+   so every other board builds untouched. Either USB Mode works: this sketch
+   uses no feature of the TinyUSB mode. */
+#if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
+#error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
 
 /* ---- the shape of the instrument ---------------------------------------

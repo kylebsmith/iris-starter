@@ -50,13 +50,15 @@
 #pragma STDC FP_CONTRACT OFF
 #endif
 
-#ifndef ARDUINO_ARCH_ESP32
-#error "board_probe times an ESP32-S3 with its cycle counter. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module."
+/* BOARD SETTINGS. board_probe times the ESP32-S3 with its cycle counter, so
+   it needs the ESP32-S3 board entry; Serial reaches the computer through the
+   chip's own USB port only with USB CDC On Boot enabled. Either USB Mode
+   works: this sketch uses no feature of the TinyUSB mode. */
+#if !defined(ARDUINO_ARCH_ESP32) || !defined(CONFIG_IDF_TARGET_ESP32S3)
+#error "board_probe times an ESP32-S3 with its cycle counter. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module, then set the board options in GET-STARTED.md."
 #endif
-/* Serial Monitor reaches this board over its own USB port, and only when
-   CDC On Boot is on. Either USB Mode works. */
-#if !ARDUINO_USB_CDC_ON_BOOT
-#error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port, and with this setting off everything printed goes to pins 43 and 44 instead, so Serial Monitor stays empty."
+#if defined(CONFIG_IDF_TARGET_ESP32S3) && !ARDUINO_USB_CDC_ON_BOOT
+#error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
 
 #include <esp_cpu.h>
