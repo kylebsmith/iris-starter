@@ -12,7 +12,8 @@ its data line and **SCL** its clock line. **GPIO** (general-purpose
 input/output) is a numbered pin of the chip. **MIDI** (Musical Instrument
 Digital Interface) is the message format synthesisers understand, and
 **USB-OTG** (On-The-Go) is the USB Mode setting that lets the board appear
-as a MIDI device.
+as a MIDI device. **UART** (universal asynchronous receiver-transmitter) is
+the chip's plain serial port.
 
 | Symptom | Likely cause | What to do |
 |---|---|---|
@@ -37,3 +38,4 @@ as a MIDI device.
 | The curve in `iris_scope` is flat | Two different targets at nearly the same pose; the network plays their average | Move the sensor a long way between demonstrations; `c` clears. |
 | The `iris_scope` plot stays empty | Processing opened the wrong serial port, or the Arduino Serial Monitor still holds the port | Close Serial Monitor. In the plot window press **LEFT** or **RIGHT** to step through the ports; the top right names the one it is listening on. |
 | `iris_instrument` runs but no MIDI device appears | USB Mode is not USB-OTG (TinyUSB) | Set **Tools → USB Mode → USB-OTG (TinyUSB)**. The sketch refuses to build otherwise, so this means an old build is on the board. |
+| The MIDI device appears but the synthesiser does not respond | The synthesiser is not listening to the board, or nothing in it is assigned to controllers 1, 2 and 3 on channel 1 | Choose the board as the synthesiser's MIDI input and assign the controllers: [SOUND.md](SOUND.md). |

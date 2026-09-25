@@ -2,9 +2,9 @@
 
 Pick what you want. Every one of these is real work that ends up in the repo,
 and every one has a definite finish line so you know when you're done without
-asking me.
+asking.
 
-I've marked what each one actually needs. **"None"** means none — you do not
+Each one is marked with what it needs. **"None"** means none — you do not
 need to have done any of this before.
 
 ---
@@ -16,19 +16,21 @@ need to have done any of this before.
 That's the deliverable.
 
 **Read one paper and write 200 words.** What does it claim, what did it measure,
-what would you try? One paper. Not a literature review — I'll give you the list.
+what would you try? One paper, from the list handed out in class. Not a
+literature review.
 
 ---
 
 ## Week 2 — the one that makes the point
 
-**Try to install a dead tool.** Pick one from the list I'll hand out — MnM
-(IRCAM's mapping toolbox for Max), GRT (the Gesture Recognition Toolkit), an
-old Wekinator example patch. Try to build and run it. Write down exactly
+**Try to install a dead tool.** Pick one from the list handed out in class —
+MnM (the mapping toolbox for Max from IRCAM, the Institut de Recherche et
+Coordination Acoustique/Musique in Paris), GRT (the Gesture Recognition
+Toolkit), an old Wekinator example patch. Try to build and run it. Write down exactly
 what broke and how far you got.
 *Needs: none, and stubbornness helps.*
 
-Most of you will fail. That's the finding. These are tools that worked fine when
+Most of you will fail. That is the result. These are tools that worked fine when
 they were published, and the reason our library has no dependencies is sitting
 in whatever error message you end up staring at.
 
@@ -66,9 +68,9 @@ train it, and it changes how training feels.
 
 **Break it on purpose.** Record contradictory demonstrations, feed it garbage,
 unplug the sensor mid-training, record all sixteen and then try a seventeenth.
-Write down everything that fails badly or fails *silently*. *Needs: none. This
-is genuinely valuable and nobody wants to do it.* A button that records a
-value you can neither see nor hear is the class of bug I want you hunting.
+Write down everything that fails badly or fails *silently*. *Needs: none.* A
+button that records a value you can neither see nor hear is the class of bug
+to hunt.
 
 ---
 
@@ -81,16 +83,15 @@ else can pick it up and play it without instructions.
 **Record real gesture data.** Twenty demonstrations of a gesture, then twenty
 more of the *same intended gesture* on a different day. *Needs: none.*
 This one matters more than it sounds: every number in the library was measured
-on clean synthetic data, and nobody has ever checked what happens with a real
-hand being inconsistent the way hands are. It's the single most useful thing
-anyone could hand me.
+on clean synthetic data, and none of it says what happens with a real hand
+being inconsistent the way hands are. This data is what would.
 
 **Fix the getting-started guide.** Follow GET-STARTED.md on a fresh machine,
 note every point where reality disagrees with it, and fix it. *Needs: none, and
-being new is an advantage.* Honestly the highest-value job on this list — I
-cannot see my own instructions with fresh eyes and you can only do it once.
+being new is an advantage:* you can read the instructions with fresh eyes only
+once, and their author never can.
 
-**Port it somewhere else.** Raspberry Pi, a browser, a phone, Max or Pd.
+**Port it somewhere else.** Raspberry Pi, a browser, a phone, Max or Pure Data.
 *Needs: more software experience.* Done when it passes the library's own test
 suite on the new target.
 
@@ -101,14 +102,14 @@ suite on the new target.
 **Make a piece.** Whatever length. Perform it.
 
 **Write up what happened.** What you built, what you tried, what didn't work,
-what you'd do differently. Failures are more interesting than successes and I'd
-rather read about the thing that didn't work.
+what you'd do differently. The thing that didn't work is worth as much space
+as the thing that did.
 
 ---
 
-## What I'm actually grading
+## What is graded
 
 Did you build a thing, did you play it, and can someone else follow what you
 did. That's it. Nothing here is graded on how technical it is.
 
-And I'd rather see one instrument you actually played than four you started.
+One instrument you actually played counts for more than four you started.

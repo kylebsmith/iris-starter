@@ -7,8 +7,9 @@ Terms used on this page: **USB** (Universal Serial Bus) is the cable
 between the board and your computer; USB-C is its reversible plug. **I2C**
 (inter-integrated circuit) is the two-wire bus that carries a data line
 (SDA) and a clock line (SCL) between the board and the sensor. **STEMMA QT**
-is Adafruit's name for its 4-pin I2C connector, a JST SH socket at 1.0 mm
-pitch, compatible with SparkFun's Qwiic. **Pitch** is the distance between
+is Adafruit's name for its 4-pin I2C connector, a JST SH socket (JST is the
+connector's maker, SH its series) at 1.0 mm pitch, compatible with
+SparkFun's Qwiic. **Pitch** is the distance between
 neighbouring pins. **IMU** (inertial measurement unit) is a motion sensor;
 the BNO055 is one, and its "9-DOF" (nine degrees of freedom) means it
 measures motion, rotation and magnetic field on three axes each. **MIDI**
