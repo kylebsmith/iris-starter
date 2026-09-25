@@ -363,7 +363,9 @@
      int   iris_worst_example(k, margin)  position of the one that fought
                                           hardest, or -1
      int   iris_worst_example_id(k, margin)  its identifier, or -1
-     float iris_loo_error(k, epochs)      a leave-one-out held-out error, or -1
+     float iris_loo_error(k, epochs)      a leave-one-out held-out error, or -1;
+                                          it REPLACES the weights with a
+                                          fixed-epoch refit (PART 8)
      float iris_suggest_smoothing(k, scratch, bytes)
                                           a smoothing value to audition, or -1
 
@@ -380,9 +382,16 @@
    IRIS_ARENA_ELM, the two added together; IRIS_MAX_IN, IRIS_MAX_OUT and
    IRIS_MAX_HID, which you may lower before the #include, and IRIS_MAX_EX;
    IRIS_VERSION_MAJOR, _MINOR, _PATCH and _STRING; IRIS_STRESS_MIN_EX and
-   IRIS_STRESS_FLAG (PART 8f); IRIS_KNN_MAXK (PART 10); the iris_status
-   values; and IRIS_NO_GUARDS, which compiles the guards out and is for
-   measuring them, not for instruments.
+   IRIS_STRESS_FLAG (PART 8f); IRIS_KNN_MAXK (PART 10); IRIS_ID_LIMIT, the
+   bound on identifiers on this machine (PART 4); IRIS_W_LIMIT, the
+   divergence guard's limit (PART 8); IRIS_FILE_MAGIC, IRIS_FILE_VERSION and
+   IRIS_FILE_HEADER, the save format's fixed values (PART 9); the iris_status
+   values; IRIS_API, which you may define before the #include to change how
+   every function is declared (the WebAssembly port marks them used); and
+   IRIS_NO_GUARDS, which compiles the guards out and is for measuring them,
+   not for instruments. Every other IRIS_ macro is part of how the file
+   works, like the iris_internal_ names: it can change in any release, and
+   defining one yourself is not supported.
 
    FAILURE, in two rules:
      A call that either works or does not returns 0 for "did nothing".
@@ -391,7 +400,8 @@
    in trouble. Zero means opposite things in the two places. A RETURN VALUE
    of 0 is bad news (the call did nothing); a STATUS of 0 is good news
    (IRIS_STATUS_OK, nothing is wrong). The full account, with the one test
-   that answers "did it train?" after every trainer, is above
+   that answers "did it train?" after every trainer and the places where the
+   two rules give different answers to similar questions, is above
    iris_get_status.
 
    THREADING: never touch the same instrument from two places at once. The
@@ -592,24 +602,27 @@
 #ifndef IRIS_MAX_OUT
 #define IRIS_MAX_OUT  16   /* sound parameters out */
 #endif
-/* THE CAP HAS TO FIT THE MACHINE'S SIZE TYPE.
+/* THE CAP KEEPS THE SIZE ARITHMETIC INSIDE 32 BITS.
 
    The bound exists to stop an overflow, not because 4,096 is musically
-   special. iris_size multiplies cap by (n_in + n_out) and by sizeof(float),
-   and on a 32-bit target (the ESP32-S3) size_t is 32 bits: a large enough
-   cap would wrap, iris_size would return a SMALL number, the arena check
-   would pass, and the demonstration store would run off the end of the
-   caller's buffer. At the maxima (32 in, 16 out) 4,096 demonstrations are
-   786,432 bytes on their own, already past the S3's 512 KB of internal
+   special. IRIS_ARENA and iris_size multiply cap by (n_in + n_out) and by
+   sizeof(float), in unsigned long, which C guarantees is at least 32 bits
+   (see the note at IRIS_ARENA). An uncapped count could wrap that product,
+   so that the arena check passed a buffer too small and the demonstration
+   store ran off the end of it. At the maxima (32 in, 64 hidden, 16 out)
+   4,096 demonstrations make an arena of 862,136 bytes on a 64-bit laptop,
+   far below 2^32, so the product cannot wrap. The demonstrations alone are
+   786,432 bytes there, already past the ESP32-S3's 512 KB of internal
    memory, so nothing a board can hold is refused.
 
-   On a 16-bit size type, every Arduino AVR board, the overflow arrives far
-   sooner, and IDENTICALLY in IRIS_ARENA and in iris_size, so the bound
-   would wrap to the same wrong number and could not see it: with a cap of
-   4,096, IRIS_ARENA(8,8,8,894) compiled for a Mega comes out around 4,000
-   bytes instead of 69,672 and the build succeeds. So the cap follows the
-   machine. 255 keeps the largest legal arena comfortably inside a 16-bit
-   size type, and 255 takes is already more than anyone records by hand. */
+   Where size_t is 16 bits, every Arduino AVR board, the cap is 255, and there
+   it describes the boards rather than an overflow: an int count cannot wrap
+   a 32-bit product, and a shape whose arena passes 65,535 bytes is refused
+   by the compiler when the array is declared in C, and by iris_size and
+   iris_init at run time in C++ (the note at IRIS_ARENA). With avr-gcc 7.3.0
+   for the atmega2560 the smallest shape, IRIS_ARENA(1, 8, 1, 255), is 5,580
+   bytes, more than an Uno's 2 KB of memory and most of a Mega's 8 KB, and
+   255 takes is already more than anyone records by hand. */
 #define IRIS_MAX_EX   ((int)(sizeof(size_t) >= 4 ? 4096 : 255))  /* stored takes */
 #ifndef IRIS_MAX_HID
 #define IRIS_MAX_HID  64   /* hidden units         */
@@ -796,9 +809,7 @@ IRIS_API int iris_internal_isbad(float x) {
    subnormals has not been measured on the chip. 1e-30 is about eight powers
    of ten above the smallest normal float (about 1.2e-38), so every processor
    evaluates the comparison identically.                                     */
-#ifndef IRIS_TINY
 #define IRIS_TINY 1e-30f
-#endif
 #ifdef IRIS_NO_GUARDS
 #define IRIS_FLUSH(v) (v)
 #else
@@ -1126,7 +1137,10 @@ struct iris {
      iris_train_progress reports it as such and snaps to 1.0 when the run
      ends, which is the only way a plateau-stopped bar can be truthful. */
   int32_t tr_done, tr_ceiling, tr_running;
-  int32_t tr_n_ex;         /* how many demonstrations the shuffle covers */
+  int32_t tr_n_ex;         /* how many demonstrations the shuffle covers,
+                              or -1 once a record or a delete has edited the
+                              store under a sliced run (see the change test
+                              in iris_internal_train_run) */
   float   tr_ref;          /* error one plateau-window ago */
   float   tr_err;          /* the last epoch's error, added up while the
                               weights moved: what the error floor and the
@@ -1258,6 +1272,20 @@ struct iris {
    doublings is the best a solve can do, and a novelty of 0 means the
    reading is exactly on a demonstration.
 
+   WHERE THE RULES DIFFER FOR SIMILAR QUESTIONS, so a table is worth having:
+     - A position with no demonstration: iris_get answers 0 (rule 1: it
+       copied nothing, and no identifier is 0) and iris_id_at answers -1
+       (rule 2).
+     - iris_train_elm's best outcome is 0 ridge doublings, which reads as
+       false (the table above).
+     - iris_set_smoothing returns nothing: a value outside 0 to 1 is clamped
+       to the nearer end without a status, and iris_get_smoothing reports
+       what was kept. Only a value that is not finite is refused, with
+       IRIS_NAN_TRAPPED.
+     - With no demonstrations stored, iris_predict writes 0 and reports
+       IRIS_NOT_FITTED, while iris_knn_predict and iris_classify_1nn write 0
+       (iris_classify_1nn also returns -1) and leave the status alone.
+
    THE READERS cannot fail and so answer every question: iris_count,
    iris_capacity, iris_seed, iris_is_trained, iris_last_error,
    iris_train_progress, iris_train_busy, iris_train_epochs_done and
@@ -1285,8 +1313,9 @@ IRIS_API iris_status iris_get_status(const iris *k) {
    ========================================================================== */
 
 /* Bytes an instrument of this shape needs. Returns 0 for a shape that cannot
-   be sized safely (any dimension out of range, or cap above IRIS_MAX_EX, which
-   would overflow size_t on a 32-bit target such as the ESP32-S3).
+   be sized safely: any dimension out of range (cap above IRIS_MAX_EX
+   included, see the note there), or an arena larger than this machine's
+   size_t can hold, which on an AVR board is anything past 65,535 bytes.
 
    READ THIS BEFORE USING THE RETURN VALUE. 0 is a SENTINEL and it does not
    protect you on its own: size_t is unsigned, so `bytes < iris_size(...)` is
@@ -1356,7 +1385,14 @@ IRIS_API void iris_internal_zero_velocity(iris *k) { if (!k) return;
    closed-form trainer (PART 8d). The random state starts again from the new
    seed. The new starting weights replace the old ones at once, so if the
    trainer then refuses -- no demonstrations, say -- the instrument is left
-   unfitted and plays as one (IRIS_NOT_FITTED) until a trainer succeeds. */
+   unfitted and plays as one (IRIS_NOT_FITTED) until a trainer succeeds.
+
+   A sliced run in flight ends here, as it does at iris_clear, a closed-form
+   solve and a load: its remaining slices would train the new seed's weights
+   inside the old run's session, with its shuffle, its epoch count and its
+   plateau reference, and give an instrument that neither seed reproduces.
+   iris_train_slice returns 0 from then on; iris_train or iris_train_begin
+   starts the run for the new seed. */
 IRIS_API void iris_reseed(iris *k, uint32_t seed) { if (!k) return;
   k->seed = seed ? seed : 1u;
   k->rng.s = k->seed;
@@ -1371,6 +1407,7 @@ IRIS_API void iris_reseed(iris *k, uint32_t seed) { if (!k) return;
   k->fitted  = 0;          /* random weights are not a fit */
   k->last_error = 1.0f;
   k->status = IRIS_STATUS_OK;
+  k->tr_running = 0;
 }
 
 /* The learning rate and momentum every instrument starts with, 0.10 and 0.85,
@@ -1589,13 +1626,28 @@ IRIS_API float iris_get_smoothing(const iris *k) { if (!k) return 0.0f; return k
 IRIS_API int iris_count(const iris *k) { if (!k) return 0; return k->n_ex; }
 IRIS_API int iris_capacity(const iris *k) { if (!k) return 0; return k->cap; }
 
+/* THE IDENTIFIERS HAVE TO FIT THE MACHINE'S int, BECAUSE THEY ARE RETURNED AS
+   ONE. They are stored as int32_t, and iris_record, iris_get, iris_id_at,
+   iris_classify_1nn and iris_worst_example_id hand them back as int. Where
+   int is 16 bits, every Arduino AVR board, identifier 32,768 would come back
+   as -32,768, 65,535 as -1 (the answer that means "none") and 65,536 as 0
+   (the answer that means "refused"), and iris_delete_id could not name them.
+   So an identifier stays below this: 2^31 - 1, the largest int32_t, where int
+   has 32 bits, and 32,767 where it has 16. iris_record refuses once next_id
+   reaches it, and iris_load refuses a file whose next_id is not below it, so
+   a laptop's file with identifiers past 32,766 does not load on an AVR board
+   (PART 9). Identifiers are never reused, so it counts every take ever
+   recorded into the instrument, deleted ones included. */
+#define IRIS_ID_LIMIT ((int32_t)(sizeof(int) >= 4 ? 0x7FFFFFFFL : 0x7FFFL))
+
 /* LENGTHS, same rule as iris_predict and just as unchecked.
    Reads exactly n_in floats from `in` and n_out from `out`. */
 IRIS_API int iris_record(iris *k, const float *in, const float *out) { if (!k) return 0;
   if (k->n_ex >= k->cap) { k->status = IRIS_STORE_FULL; return 0; }
-  /* Identifiers are never reused, so they can run out: once next_id is the
-     largest int32_t, handing it out and adding one would overflow. */
-  if (k->next_id >= 0x7FFFFFFF) return 0;
+  /* Identifiers are never reused, so they can run out: once next_id reaches
+     IRIS_ID_LIMIT, handing it out would give an identifier the return type
+     cannot carry, or adding one would overflow. */
+  if (k->next_id >= IRIS_ID_LIMIT) return 0;
 
 #ifndef IRIS_NO_GUARDS
   /* REFUSE A POISONED DEMONSTRATION AT THE DOOR. A not-a-number or an
@@ -1622,6 +1674,7 @@ IRIS_API int iris_record(iris *k, const float *in, const float *out) { if (!k) r
   k->ex_id[k->n_ex] = k->next_id++;
   k->n_ex++;
   k->trained = 0;                                   /* model is now stale */
+  if (k->tr_running) k->tr_n_ex = -1;   /* a sliced run must re-read the store */
 
   /* A take was just stored, so the store is not full: clear IRIS_STORE_FULL.
      Without this, `if (iris_get_status(k))` would answer "something is
@@ -1637,7 +1690,7 @@ IRIS_API int iris_record(iris *k, const float *in, const float *out) { if (!k) r
   if (k->status == IRIS_STORE_FULL)
     k->status = IRIS_STATUS_OK;
 
-  return k->ex_id[k->n_ex - 1];
+  return (int)k->ex_id[k->n_ex - 1];   /* below IRIS_ID_LIMIT, so it fits */
 }
 
 IRIS_API int iris_index_of(const iris *k, int id) { if (!k) return -1;
@@ -1647,7 +1700,7 @@ IRIS_API int iris_index_of(const iris *k, int id) { if (!k) return -1;
 
 /* The identifier at a position, without copying the row out. */
 IRIS_API int iris_id_at(const iris *k, int idx) { if (!k) return -1;
-  return (idx < 0 || idx >= k->n_ex) ? -1 : k->ex_id[idx];
+  return (idx < 0 || idx >= k->n_ex) ? -1 : (int)k->ex_id[idx];
 }
 
 /* LENGTHS, same rule as iris_predict and just as unchecked.
@@ -1659,7 +1712,7 @@ IRIS_API int iris_get(const iris *k, int idx, float *in, float *out) { if (!k) r
   const float *row = k->ex + (size_t)idx * stride;
   if (in)  for (int i = 0; i < k->n_in;  ++i) in[i]  = row[i];
   if (out) for (int i = 0; i < k->n_out; ++i) out[i] = row[k->n_in + i];
-  return k->ex_id[idx];
+  return (int)k->ex_id[idx];
 }
 
 IRIS_API int iris_delete_index(iris *k, int idx) { if (!k) return 0;
@@ -1679,6 +1732,7 @@ IRIS_API int iris_delete_index(iris *k, int idx) { if (!k) return 0;
   k->ex_res[k->n_ex - 1] = 0.0f;
   k->n_ex--;
   k->trained = 0;
+  if (k->tr_running) k->tr_n_ex = -1;   /* a sliced run must re-read the store */
   return 1;
 }
 
@@ -1824,13 +1878,22 @@ IRIS_API void iris_internal_span(const iris *k, int c, float *lo, float *hi) {
    is trained toward it and the output scaling divides by the width. The rule:
 
        an output's width is at least max(1e-5 * |lo|, 1e-6), where lo is the
-       smallest value it was shown; a narrower output gets hi = lo + that.
+       smallest value it was shown; a narrower output gets hi = lo + that,
+       or, when lo + that would pass the largest float, lo = hi - that.
 
    That floor is relative for the reason above: an absolute 1e-6 added to a
    value above 32 changes nothing in 32-bit floating point, because the gap
    between representable numbers there is already wider, so the width would
    stay zero and every prediction would be not-a-number. An absolute floor
    works up to 31.77 and fails from 32.72.
+
+   The widening goes downward only at the very top of the float range: an
+   output shown nothing below about 3.40279e38, within 1e-5 of the largest
+   float, would get hi = infinity, and then the output scaling, the
+   substitute a playing function writes (the centre of the range) and the
+   saved file would all hold an infinity. Widened downward, both ends stay
+   finite and lo < hi, so the instrument plays finite numbers and saves
+   (tests/playing.c trains one with each trainer at the largest float).
 
    A LIMIT, STATED RATHER THAN GUARDED. A width is a float, so demonstrations
    that span more than the largest float, about 3.4e38 end to end (values
@@ -1857,7 +1920,11 @@ IRIS_API void iris_internal_fit_ranges(iris *k) { if (!k) return;
     float lo, hi;
     iris_internal_span(k, k->n_in + o, &lo, &hi);
     float w = iris_internal_absf(lo) * 1e-5f;  if (w < 1e-6f) w = 1e-6f;
-    if (hi - lo < w) hi = lo + w;
+    if (hi - lo < w) {
+      const float up = lo + w;
+      if (up <= IRIS_FLT_MAX) hi = up;   /* upward, unless it overflows: */
+      else lo = hi - w;                  /* then downward, see above     */
+    }
     k->out_lo[o] = lo; k->out_hi[o] = hi;
   }
 }
@@ -2204,10 +2271,9 @@ IRIS_API int iris_internal_pinned(const iris *k) {
    the instrument: it no longer plays its old fit, but the centre of the
    demonstrated range (IRIS_NOT_FITTED), until a trainer succeeds. */
 IRIS_API float iris_internal_trap_nan(iris *k) {
-  iris_reseed(k, k->seed);
+  iris_reseed(k, k->seed);                 /* which also ends a sliced run */
   for (int i = 0; i < k->cap; ++i) k->ex_res[i] = 0.0f;
   k->res_epochs = 0;
-  k->tr_running = 0;
   k->status = IRIS_NAN_TRAPPED;
   return -1.0f;
 }
@@ -2472,9 +2538,13 @@ IRIS_API float iris_internal_train_run(iris *k, int epochs, int conv, int resume
     iris_internal_begin_session(k, epochs);
   } else if (k->tr_n_ex != k->n_ex) {
     /* The data changed under a running slice -- a record or a delete between
-       two calls. The shuffle covers a fixed count, so the permutation no
-       longer describes the data: rebuild it, or the new demonstration is never
-       visited and a deleted one still is.
+       two calls. Each of them sets tr_n_ex to -1 while a run is going, which
+       matches no count, so an edit that leaves the count as it was is seen
+       too: delete a bad take and record its replacement, the repair this
+       library teaches, and the count is the same while the data is not. The
+       shuffle covers a fixed count, so the permutation no longer describes
+       the data: rebuild it, or the new demonstration is never visited and a
+       deleted one still is.
 
        Also restart the plateau window. The stopping test asks whether the
        error fell since last window, and new data makes the error JUMP UP, so
@@ -2739,9 +2809,10 @@ IRIS_API float iris_internal_train_run(iris *k, int epochs, int conv, int resume
    mapping there 0.75 to 0.82 of full scale wrong (8 of 8 seeds). A take
    outside the demonstrated range does damage of its own, because every run
    refits the ranges: correcting at twice the range moves the whole mapping
-   by 0.07 to 0.16, against about 0.0015 for a take inside it. After
-   deleting a take, call iris_train, which starts over from the seed and
-   fits only the demonstrations stored now.
+   by 0.07 to 0.16, against about 0.0015 for a take inside it. (These
+   figures come from studies whose programs are not in this repository.)
+   After deleting a take, call iris_train, which starts over from the seed
+   and fits only the demonstrations stored now.
 
    THE SEED ALONE NO LONGER DESCRIBES THE INSTRUMENT. A warm run draws its
    shuffle from the random state the last run left, so after one the seed
@@ -3037,7 +3108,9 @@ IRIS_API int   iris_is_trained(const iris *k) { if (!k) return 0; return k->trai
    and after a save and a load. 1.0 before any fit, after iris_clear and
    after a run that ended unfitted. A record or a delete does not re-measure
    it: until the next training run it describes the demonstrations the fit
-   was made on. */
+   was made on. A load does measure it, over the demonstrations in the file,
+   so on a stale instrument (iris_is_trained 0) the figure changes across a
+   save and a load; on a trained one it does not. */
 IRIS_API float iris_last_error(const iris *k) { if (!k) return 0.0f; return k->last_error; }
 IRIS_API uint32_t iris_seed(const iris *k)    { if (!k) return 0u; return k->seed; }
 
@@ -3410,7 +3483,7 @@ IRIS_API int iris_worst_example(const iris *k, float *margin) { if (!k) return -
    is nothing to say. */
 IRIS_API int iris_worst_example_id(const iris *k, float *margin) { if (!k) return -1;
   int i = iris_worst_example(k, margin);
-  return i < 0 ? -1 : k->ex_id[i];
+  return i < 0 ? -1 : (int)k->ex_id[i];
 }
 
 /* ==========================================================================
@@ -3929,7 +4002,8 @@ IRIS_API int iris_train_elm(iris *k, float lam0, void *scratch, size_t scratch_b
          28  n_ex, demonstrations stored          u32      at most the receiver's
                                                            capacity
          32  seed                                 u32      not 0
-         36  next_id, the next identifier         u32      1 <= next_id < 2^31 - 1
+         36  next_id, the next identifier         u32      1 <= next_id <
+                                                           IRIS_ID_LIMIT
          40  random-number state                  u32      not 0
          44  smoothing                            f32      finite, 0 to 1
          48  w1, b1, w2, b2                       f32s     finite
@@ -3959,10 +4033,13 @@ IRIS_API int iris_train_elm(iris *k, float lam0, void *scratch, size_t scratch_b
        IRIS_MAX_IN (see the note above iris_internal_shape_fits).
      - Unsigned throughout: a count with its top bit set is a large number
        that fails "at most the capacity", not a negative one that passes it.
-     - next_id stays below 2^31 - 1, the largest int32_t, so a loaded
-       instrument has at least one identifier left to hand out. iris_record
-       hands out next_id and adds one, and refuses once next_id reaches the
-       largest int32_t, so the count never overflows.
+     - next_id stays below IRIS_ID_LIMIT -- 2^31 - 1, the largest int32_t,
+       where int has 32 bits, and 32,767 where it has 16 -- so a loaded
+       instrument has at least one identifier left to hand out, and every
+       identifier fits the int the functions return it as. iris_record hands
+       out next_id and adds one, and refuses once next_id reaches the limit,
+       so the count never overflows. The limit belongs to the receiving
+       machine, like the capacity: the bytes mean the same everywhere.
      - A weight need only be finite. IRIS_W_LIMIT is backpropagation's
        detector for a runaway run, not a rule about valid instruments: the
        closed-form trainer (PART 8d) legitimately solves output weights beyond
@@ -3987,7 +4064,13 @@ IRIS_API int iris_train_elm(iris *k, float lam0, void *scratch, size_t scratch_b
    learning rate and momentum are the defaults every instrument starts with,
    the record of which demonstration fights the others (PART 8f) is empty,
    any sliced training run is over, the status is IRIS_STATUS_OK, and
-   iris_last_error is measured afresh over the demonstrations.
+   iris_last_error is measured afresh over the demonstrations. For an
+   instrument whose fit still matches its demonstrations that is the figure
+   it reported before the save, to the bit. For a stale one -- a take
+   recorded or deleted since the last fit -- it is not: the saved instrument
+   still reported the error over the demonstrations it was fitted on, and
+   the load measures the same weights over the demonstrations the file
+   holds now.
 
    WHY FITTED AND TRAINED ARE TWO BITS. `fitted` means this instrument has
    produced a fit and plays it; `trained` means that fit still describes the
@@ -4135,7 +4218,7 @@ IRIS_API int iris_internal_file_ok(const iris *k, const unsigned char *b, size_t
   if (iris_internal_crc32(b, bytes - 4u) != iris_internal_get_u32(b + bytes - 4u)) return 0;
   if (iris_internal_get_u32(b + 32) == 0u) return 0;                   /* seed */
   next_id = iris_internal_get_u32(b + 36);
-  if (next_id < 1u || next_id >= 0x7FFFFFFFu) return 0;
+  if (next_id < 1u || next_id >= (uint32_t)IRIS_ID_LIMIT) return 0;
   if (iris_internal_get_u32(b + 40) == 0u) return 0;       /* random state */
   { const float s = iris_internal_get_f32(b + 44);
     if (iris_internal_isbad(s) || s < 0.0f || s > 1.0f) return 0; }
@@ -4259,8 +4342,11 @@ IRIS_API int iris_load(iris *k, const void *buf, size_t bytes) {
 
   /* The training error is not in the file, but the fit and the demonstrations
      are, so it is measured exactly as every trainer measures it when it
-     finishes (iris_internal_recall_error): a loaded instrument reports the
-     bits the saved one did. */
+     finishes (iris_internal_recall_error). A loaded instrument whose fit
+     matches its demonstrations reports the bits the saved one did; a stale
+     one reports the error over the demonstrations it holds now, which the
+     saved one, not re-measured since its last fit, did not (see AFTER A
+     LOAD above). */
   { float x[IRIS_MAX_IN];
     k->last_error = iris_internal_recall_error(k, x); }
   return 1;
@@ -4308,9 +4394,10 @@ IRIS_API int iris_load(iris *k, const void *buf, size_t bytes) {
 
      - STRUCTURAL SAFETY. The answer is a weighted average of demonstrated
        outputs, held inside their range: it is never a not-a-number and
-       never leaves the range you demonstrated, whatever the input does.
-       When every neighbour carries the same value, the answer is exactly
-       that value.
+       never leaves the range you demonstrated, whatever finite reading comes
+       in, however far from every take (a reading that is not finite is
+       refused, with the substitute and IRIS_NAN_TRAPPED). When every
+       neighbour carries the same value, the answer is exactly that value.
 
      - THE ACCURACY FLOOR. The MLP generalises better at EVERY count of
        demonstrations measured (2.4 times at 5, 2.1 times at 200;
@@ -4342,6 +4429,7 @@ IRIS_API int iris_load(iris *k, const void *buf, size_t bytes) {
 
 #define IRIS_KNN_MAXK 8          /* stack bound; k above this is clamped */
 #define IRIS_KNN_GUARD 1e-9f     /* zero-distance guard for the weights */
+#define IRIS_KNN_FAR 1e15f       /* the most ranges one input can count */
 
 /* THE NEIGHBOUR SCALE: one multiplier per input, 1/width of its range, so a
    distance counts each input in fractions of its demonstrated range. A still
@@ -4368,13 +4456,64 @@ IRIS_API float iris_internal_distance2(const iris *k, const float *inv,
   return d;
 }
 
+/* THE FAR DISTANCE, for when every ordinary distance has overflowed: the
+   same count, with no input counting more than IRIS_KNN_FAR (10^15) ranges
+   and a still input skipped outright.
+
+   WHEN IT IS NEEDED. The ranges are the ones the instrument was last fitted
+   to, and a take recorded since can lie any distance outside them: a take at
+   1e20 on an input fitted to 0..1 is 1e20 ranges from a reading of 0.5, and
+   the square of that overflows to infinity. With every stored take that far
+   out no ordinary distance is finite, so a finite reading would have no
+   nearest take: iris_knn_predict would play its substitute, outside the
+   outputs demonstrated, iris_classify_1nn would answer -1 and
+   iris_delete_nearest would delete nothing, with takes stored. The neighbour
+   functions scan again with this distance instead. Capped, each input adds at
+   most 10^30, so between finite numbers it is always finite, and below 10^38
+   for any IRIS_MAX_IN up to 340,000. Skipping a still input keeps an overflowed
+   difference times its zero scale from making a not-a-number.
+
+   WHY ONLY THEN. The skip and the two comparisons per input slow the scan
+   by more than half: 4,000 k-nearest and 1-nearest queries over 2,000 takes
+   of 8 inputs take 0.186 s with them in the ordinary distance and 0.118 s
+   without (Apple clang -O2, the development laptop). Used only when no
+   ordinary distance is finite, they cost nothing otherwise, and every
+   reading with a finite distance to some take plays exactly what it did
+   without them. */
+IRIS_API float iris_internal_distance2_far(const iris *k, const float *inv,
+                                           const float *row, const float *in) {
+  float d = 0.0f;
+  for (int i = 0; i < k->n_in; ++i) {
+    if (inv[i] == 0.0f) continue;
+    float t = (row[i] - in[i]) * inv[i];
+    if (t >  IRIS_KNN_FAR) t =  IRIS_KNN_FAR;
+    if (t < -IRIS_KNN_FAR) t = -IRIS_KNN_FAR;
+    d += t * t;
+  }
+  return d;
+}
+
+/* One row, index r at squared distance d, offered to the kk nearest found so
+   far, which bd and bi hold nearest first. Strict <: on a tie the earlier
+   take keeps its slot (the Weka rule). */
+IRIS_API void iris_internal_knn_insert(float *bd, int *bi, int kk, int r, float d) {
+  int p = kk;
+  while (p > 0 && d < bd[p - 1]) --p;
+  if (p < kk) {
+    for (int q = kk - 1; q > p; --q) { bd[q] = bd[q-1]; bi[q] = bi[q-1]; }
+    bd[p] = d; bi[p] = r;
+  }
+}
+
 /* THE NEAREST DEMONSTRATION: the index of the stored row closest to `in`, the
    earliest-recorded on a tie (strict <, the Weka rule), or -1 when there is
    none -- an empty store, a shape too big for this translation unit, or a
-   query whose distance to every row is not finite (a not-a-number reading,
-   or one so far out that its square overflows). The search starts at the
-   largest finite float, so every smaller distance counts however far outside
-   the demonstrations the query is. Like iris_knn_predict it fits the ranges
+   query whose distance to every row is not a number, which takes a reading
+   or a stored value that is not finite. The search starts at the largest
+   finite float, so every smaller distance counts however far outside the
+   demonstrations the query is, and when no ordinary distance is finite it
+   searches again with the far distance above, which between finite numbers
+   always is. Like iris_knn_predict it fits the ranges
    of an instrument that has never been fitted -- but first it refuses a
    reading that is not finite, which has no nearest demonstration, and then
    the one thing it writes is the status, IRIS_NAN_TRAPPED, as iris_record
@@ -4398,6 +4537,11 @@ IRIS_API int iris_internal_nearest(iris *k, const float *in) {
     const float d = iris_internal_distance2(k, inv, k->ex + (size_t)r * stride, in);
     if (d < best_d) { best_d = d; best = r; }
   }
+  if (best < 0)
+    for (int r = 0; r < k->n_ex; ++r) {
+      const float d = iris_internal_distance2_far(k, inv, k->ex + (size_t)r * stride, in);
+      if (d < best_d) { best_d = d; best = r; }
+    }
   return best;
 }
 
@@ -4468,24 +4612,26 @@ IRIS_API void iris_knn_predict(iris *k, const float *in, float *out, int kk) { i
   float bd[IRIS_KNN_MAXK];
   for (int n = 0; n < IRIS_KNN_MAXK; ++n) { bi[n] = -1; bd[n] = IRIS_FLT_MAX; }
 
-  for (int r = 0; r < k->n_ex; ++r) {
-    const float d = iris_internal_distance2(k, inv, k->ex + (size_t)r * stride, in);
-    /* strict < : on a tie the earlier example keeps its slot (Weka rule) */
-    int p = kk;
-    while (p > 0 && d < bd[p - 1]) --p;
-    if (p < kk) {
-      for (int q = kk - 1; q > p; --q) { bd[q] = bd[q-1]; bi[q] = bi[q-1]; }
-      bd[p] = d; bi[p] = r;
-    }
-  }
+  /* The ordinary scan, and when it finds no finite distance at all -- every
+     take far outside the ranges the instrument was fitted to -- the same scan
+     with the far distance (see iris_internal_distance2_far). */
+  for (int r = 0; r < k->n_ex; ++r)
+    iris_internal_knn_insert(bd, bi, kk, r,
+                             iris_internal_distance2(k, inv, k->ex + (size_t)r * stride, in));
+  if (bi[0] < 0)
+    for (int r = 0; r < k->n_ex; ++r)
+      iris_internal_knn_insert(bd, bi, kk, r,
+                               iris_internal_distance2_far(k, inv, k->ex + (size_t)r * stride, in));
 
 #ifndef IRIS_NO_GUARDS
-  /* A query so far out that every distance overflows to +inf -- a reading
-     that is not finite was refused above -- makes every comparison false, so
-     no row is ever inserted and each bi[n] is still -1, and -1 * stride is an
-     out-of-bounds read into whatever sits beside the arena. Refuse instead:
-     write the substitute (iris_internal_centre) and report, exactly like the
-     MLP backstop. */
+  /* A distance that is not a number to every take makes every comparison
+     false, so no row is ever inserted and each bi[n] is still -1, and -1 *
+     stride is an out-of-bounds read into whatever sits beside the arena. A
+     reading that is not finite was refused above, and the far distance is
+     finite between finite numbers, so that takes a stored value that is not
+     finite: iris_record and iris_load refuse one, but the store is memory
+     the caller can reach. Refuse instead: write the substitute
+     (iris_internal_centre) and report, exactly like the MLP backstop. */
   if (bi[0] < 0) {
     for (int o = 0; o < NOut; ++o) out[o] = iris_internal_centre(k, o);
     k->status = IRIS_NAN_TRAPPED;
@@ -4562,7 +4708,7 @@ IRIS_API void iris_knn_predict(iris *k, const float *in, float *out, int kk) { i
 /* 1-NN classification: snap to the single nearest demonstration and return
    its outputs VERBATIM (bit-for-bit) plus its identifier, or -1 if the store
    is empty, the shape is too big for this translation unit, or the reading
-   has no finite distance to any take. For a classifier task store the class
+   is not finite. For a classifier task store the class
    label in out[0]; this then follows the rules of desktop Wekinator's
    default for discrete outputs, Weka's IBk nearest-neighbour classifier with
    k=1: distance normalised by each input's range, Euclidean (straight-line),
@@ -4587,8 +4733,9 @@ IRIS_API int iris_classify_1nn(iris *k, const float *in, float *out) { if (!k) r
                                                 after refusing a reading that
                                                 is not finite */
 #ifndef IRIS_NO_GUARDS
-  /* A query whose distance to every demonstration is not finite -- a
-     disconnected sensor reading not-a-number -- has no nearest row. Answering
+  /* A query with no nearest row -- a disconnected sensor reading
+     not-a-number, or a store whose every take holds a value that is not
+     finite, which only a write into the arena can make -- gets none. Answering
      with the first demonstration would give a classifier a confident wrong
      class and a healthy status, so it refuses instead, as iris_knn_predict
      does: the substitute, and IRIS_NAN_TRAPPED. */
@@ -4615,7 +4762,7 @@ IRIS_API int iris_classify_1nn(iris *k, const float *in, float *out) { if (!k) r
       }
 #endif
   }
-  return k->ex_id[best];
+  return (int)k->ex_id[best];
 }
 
 /* The end of the floating-point scope opened by defence 3 of the determinism
