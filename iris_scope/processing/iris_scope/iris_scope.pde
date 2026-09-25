@@ -391,6 +391,13 @@ void mouseReleased() { dragging = -1; }
 void setAim(int which, float v) {
   v = constrain(v, 0, 1);
   if (which == 0) aim0 = v; else aim1 = v;
+  sendAim();
+}
+
+/* The board keeps the last target it was sent, and starts at 0.5 / 0.5 after
+   every reset. Sending the handles again before each SPACE means the pose is
+   always taught the values on the screen, dragged or not. */
+void sendAim() {
   if (port != null) port.write("T " + nf(aim0, 1, 4) + " " + nf(aim1, 1, 4) + "\n");
 }
 
@@ -398,5 +405,6 @@ void keyPressed() {
   if (key == 's') { saveFrame("iris_scope-####.png"); message = "saved a picture"; return; }
   if (keyCode == LEFT)  { openPort(portIndex - 1); return; }
   if (keyCode == RIGHT) { openPort(portIndex + 1); return; }
+  if (port != null && key == ' ') sendAim();
   if (port != null && (key == ' ' || key == 'd' || key == 'c')) port.write(key);
 }
