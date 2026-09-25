@@ -44,9 +44,9 @@ package 3.3.3):
 
 | sketch | flash (program storage) | RAM (working memory) |
 |---|---|---|
-| `iris_tilt` | 404,043 B (12%) | 46,368 B (14%) |
+| `iris_tilt` | 404,147 B (12%) | 46,368 B (14%) |
 | `display_check` | 409,371 B (13%) | 45,520 B (13%) |
-| `iris_instrument` | 423,451 B (13%) | 47,264 B (14%) |
+| `iris_instrument` | 423,487 B (13%) | 47,264 B (14%) |
 
 Almost all of that is the Arduino and USB runtime. iris itself is a few
 kilobytes: `iris_tilt`'s whole instrument — weights, demonstrations and all —

@@ -563,8 +563,9 @@
    the shape you asked for: iris_internal_train_run alone reserves
    float x[IRIS_MAX_IN] and float t[IRIS_MAX_OUT], 192 bytes, whether your
    instrument has 32 inputs or 2. avr-gcc 7.3.0 -mmcu=atmega328p -Os
-   -fstack-usage gives iris_internal_train_run a frame of 288 bytes and
-   iris_predict 164. An Uno has 2 KB of memory in total and a sketch leaves a
+   -fstack-usage, with every function compiled on its own (IRIS_API defined
+   empty), gives iris_internal_train_run a frame of 284 bytes and
+   iris_predict 158. An Uno has 2 KB of memory in total and a sketch leaves a
    few hundred bytes of it for the stack, so the defaults do not fit it with
    room to spare.
 
@@ -577,8 +578,8 @@
        #include "iris.h"
 
    With the same compiler and flags iris_internal_train_run, the deepest
-   frame on the record/train/predict path, falls from 288 bytes to 128, a
-   saving of 160, and iris_predict from 164 to 52; a caller into which the
+   frame on the record/train/predict path, falls from 284 bytes to 124, a
+   saving of 160, and iris_predict from 158 to 46; a caller into which the
    compiler inlines that whole path measures 280 and 120. These are
    single frames as the compiler reports them, not a measured run-time
    stack depth. The only rule is that the maxima must be at least the n_in,
@@ -1724,6 +1725,17 @@ IRIS_API void iris_clear(iris *k) {
      would never end: a sketch with a clear button and sliced training is
      one press from that. */
   k->tr_running = 0; k->tr_done = 0; k->tr_n_ex = 0; k->tr_ref = 0.0f; k->tr_err = 0.0f;
+  /* The worst-demonstration ledger (PART 8f) goes with the demonstrations it
+     describes. It is indexed by position, so without this the takes recorded
+     next would read the cleared takes' sums until the next training run:
+     in tests/train.c, twelve clean takes recorded after a clear inherit a
+     bad take's sum, and iris_worst_example names a clean one with a margin
+     of 3.45, past IRIS_STRESS_FLAG. Emptied, the ledger's readers answer -1,
+     as on a fresh instrument, and with the ceiling at 0 as well
+     iris_train_progress reads 0.0: no run has started on these
+     demonstrations. */
+  for (int i = 0; i < k->cap; ++i) k->ex_res[i] = 0.0f;
+  k->res_epochs = 0; k->tr_ceiling = 0;
 }
 
 /* ==========================================================================
@@ -2986,8 +2998,9 @@ IRIS_API float iris_train_progress(const iris *k) { if (!k) return 0.0f;
      empty one slice later, then full again. After any gradient run the
      ceiling is set -- iris_train_begin sets it first thing -- and a
      closed-form solve, which has no epochs and no ceiling, leaves its ledger
-     behind (res_epochs 1, PART 8d). All three are 0 only on a fresh or
-     freshly-loaded instrument, so they are what tells the two apart. */
+     behind (res_epochs 1, PART 8d). All three are 0 only on an instrument
+     that is fresh, freshly loaded or freshly cleared, so they are what tells
+     the two apart. */
   if (!k->tr_running)
     return (k->tr_ceiling > 0 || k->tr_done > 0 || k->res_epochs > 0) ? 1.0f : 0.0f;
   if (k->tr_ceiling <= 0) return 1.0f;
@@ -3340,7 +3353,8 @@ IRIS_API float iris_suggest_smoothing(iris *k, void *scratch, size_t scratch_byt
    a RANKING, and it is meaningful at any count; only the decision to speak
    needs a crowd. It refuses with -1 (rule 2 of the failure rules) for a null
    instrument, for an index out of range, and when there is no ledger to
-   read: no training run or solve since the instrument was made or loaded.
+   read: no training run or solve since the instrument was made, loaded or
+   cleared.
    A stress is never negative, so a refusal cannot be mistaken for 0, a
    demonstration the network never missed. It is 0 for every demonstration
    when none was ever missed at all. */
@@ -3356,7 +3370,7 @@ IRIS_API float iris_example_stress(const iris *k, int idx) { if (!k) return -1.0
 
 /* The one to point at. Returns the INDEX of the demonstration that fought
    hardest, or -1 when there is nothing to point at: no training run or
-   solve since the instrument was made or loaded, or fewer than
+   solve since the instrument was made, loaded or cleared, or fewer than
    IRIS_STRESS_MIN_EX demonstrations. *margin, when given, receives worst
    divided by second-worst.
 
