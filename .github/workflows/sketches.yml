@@ -1,0 +1,116 @@
+# Compiles every sketch for the board in GET-STARTED.md, the way a student's
+# Arduino IDE does, and fails on any warning or error from this repository's
+# own files. Warnings from the ESP32 board package's own headers are not
+# ours and are ignored. A second job checks that every copy of iris.h is the
+# library version the sketches state.
+name: sketches
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  ESP32_CORE: "3.3.3"
+  ESP32_INDEX: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+  # The board options in GET-STARTED.md, step 4.
+  FQBN_DOCUMENTED: "esp32:esp32:esp32s3:USBMode=default,CDCOnBoot=cdc,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB"
+  # The board's default USB mode, which every sketch but iris_instrument supports.
+  FQBN_HWCDC: "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB"
+  # The library release the copies of iris.h must equal.
+  IRIS_REPO: https://github.com/kylebsmith/iris
+  IRIS_REF: v0.2.0
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Install the ESP32 board package and the three libraries
+        run: |
+          arduino-cli core update-index --additional-urls "$ESP32_INDEX"
+          arduino-cli core install "esp32:esp32@$ESP32_CORE" --additional-urls "$ESP32_INDEX"
+          arduino-cli lib install "Adafruit BNO055" "Adafruit GFX Library" "Adafruit ILI9341"
+
+      - name: Compile every sketch, failing on our own warnings
+        run: |
+          set -u
+          fail=0
+          compile() {  # compile <label> <fqbn> <sketch dir>
+            label=$1; fqbn=$2; dir=$3
+            build="$RUNNER_TEMP/build/$label/$(echo "$dir" | tr '/' '_')"
+            log="$RUNNER_TEMP/$label-$(echo "$dir" | tr '/' '_').log"
+            if arduino-cli compile --fqbn "$fqbn" --warnings all --build-path "$build" "$dir" > "$log" 2>&1; then
+              status=ok
+            else
+              status=FAILED
+            fi
+            # Our files: the sketch folders, and the copies arduino-cli makes of
+            # them under <build>/sketch/. Everything else is the board package's.
+            own=$(grep -E "^($GITHUB_WORKSPACE|$build/sketch)/[^:]+:[0-9]+(:[0-9]+)?: (warning|error)" "$log" || true)
+            printf '%-9s %-28s %s  %s\n' "$label" "$dir" "$status" \
+              "$(grep -oE 'Sketch uses [0-9]+ bytes|Global variables use [0-9]+ bytes' "$log" | tr '\n' ' ')"
+            if [ "$status" != ok ] || [ -n "$own" ]; then
+              echo "::group::$label $dir"
+              cat "$log"
+              echo "::endgroup::"
+              [ -n "$own" ] && printf '%s\n' "$own" | sed 's/^/::error::/'
+              fail=1
+            fi
+          }
+          for ino in $(find . -name '*.ino' -not -path './.git/*' | sort); do
+            dir=$(dirname "$ino" | sed 's|^\./||')
+            compile documented "$FQBN_DOCUMENTED" "$dir"
+            [ "$dir" = iris_instrument ] || compile hwcdc "$FQBN_HWCDC" "$dir"
+          done
+          exit $fail
+
+      - name: iris_instrument refuses to build without TinyUSB
+        run: |
+          if arduino-cli compile --fqbn "$FQBN_HWCDC" --build-path "$RUNNER_TEMP/build/refuse" iris_instrument > "$RUNNER_TEMP/refuse.log" 2>&1; then
+            echo "::error::iris_instrument built in Hardware CDC and JTAG mode; its USB Mode guard is gone"
+            exit 1
+          fi
+          grep -q "Set Tools -> USB Mode -> USB-OTG (TinyUSB)" "$RUNNER_TEMP/refuse.log"
+
+  header:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Every iris.h is one file, the version the sketches state
+        run: |
+          set -u
+          fail=0
+          copies=$(find . -name iris.h -not -path './.git/*' | sort)
+          first=$(echo "$copies" | head -n 1)
+          for f in $copies; do
+            cmp -s "$first" "$f" || { echo "::error file=$f::differs from $first"; fail=1; }
+            dir=$(dirname "$f")
+            ls "$dir"/*.ino > /dev/null 2>&1 || { echo "::error file=$f::no sketch in this folder"; fail=1; continue; }
+            grep -q '#include "iris.h"' "$dir"/*.ino || { echo "::error file=$f::its sketch never includes iris.h"; fail=1; }
+          done
+          major=$(sed -n 's/^#define IRIS_VERSION_MAJOR \([0-9]*\).*/\1/p' "$first")
+          minor=$(sed -n 's/^#define IRIS_VERSION_MINOR \([0-9]*\).*/\1/p' "$first")
+          patch=$(sed -n 's/^#define IRIS_VERSION_PATCH \([0-9]*\).*/\1/p' "$first")
+          echo "iris.h copies are version $major.$minor.$patch"
+          while IFS= read -r ino; do
+            grep -q '#include "iris.h"' "$ino" || continue
+            [ -f "$(dirname "$ino")/iris.h" ] || { echo "::error file=$ino::includes iris.h but has no copy"; fail=1; }
+            grep -q "#if IRIS_VERSION_MAJOR != $major || IRIS_VERSION_MINOR != $minor" "$ino" \
+              || { echo "::error file=$ino::does not check for iris $major.$minor"; fail=1; }
+          done <<EOF_LIST
+          $(find . -name '*.ino' -not -path './.git/*' | sort)
+          EOF_LIST
+          [ "v$major.$minor.$patch" = "$IRIS_REF" ] || { echo "::error::copies are $major.$minor.$patch, IRIS_REF is $IRIS_REF"; fail=1; }
+          exit $fail
+
+      - name: The copies equal iris.h at the library's release tag
+        run: |
+          git clone --quiet --depth 1 --branch "$IRIS_REF" "$IRIS_REPO" "$RUNNER_TEMP/iris"
+          IRIS_SRC="$RUNNER_TEMP/iris/iris.h" sh sync-iris.sh
