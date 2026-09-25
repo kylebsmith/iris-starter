@@ -16,7 +16,7 @@ env:
   ESP32_CORE: "3.3.3"
   ESP32_INDEX: https://espressif.github.io/arduino-esp32/package_esp32_index.json
   # The board options in GET-STARTED.md, step 4.
-  FQBN_DOCUMENTED: "esp32:esp32:esp32s3:USBMode=default,CDCOnBoot=cdc,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB"
+  FQBN_DOCUMENTED: "esp32:esp32:esp32s3:USBMode=default,CDCOnBoot=cdc,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,UploadMode=cdc"
   # The board's default USB mode, which every sketch but iris_instrument supports.
   FQBN_HWCDC: "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB"
   # The library release the copies of iris.h must equal.
@@ -27,7 +27,7 @@ jobs:
   compile:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: arduino/setup-arduino-cli@v2
 
@@ -81,7 +81,7 @@ jobs:
   header:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Every iris.h is one file, the version the sketches state
         run: |
