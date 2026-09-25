@@ -30,9 +30,10 @@
                                     the trained network -- to flash.
 
    On the next power-up the sketch loads it and plays exactly what you were
-   playing when you held SAVE. If the saved instrument was not trained (it had
-   fewer than two demonstrations, or its training failed), it retrains from
-   the saved demonstrations as soon as it has loaded them.
+   playing when you held SAVE. An instrument saved untrained with two or more
+   demonstrations (its training had failed) retrains from them as soon as it
+   has loaded them; one saved with a single demonstration trains at the next
+   tap, which records the second.
 
    The other sketches deliberately do not save, so that the first file you
    read is as short as it can be -- this is the one to copy the two calls
@@ -53,11 +54,13 @@
 #error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
-/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB socket is the chip's own
-   USB port, as on the ES3C28P, Serial reaches the computer only with USB
-   CDC On Boot enabled. ARDUINO_USB_MODE exists only on chips with that port,
-   so every other board builds untouched. Either USB Mode works: this sketch
-   uses no feature of the TinyUSB mode. */
+/* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB (Universal Serial Bus)
+   socket is the chip's own USB port, as on the ES3C28P, Serial reaches the
+   computer only with USB CDC On Boot enabled (CDC, Communications Device
+   Class, is the USB standard for a serial port). ARDUINO_USB_MODE exists only
+   on chips with that port, so every other board builds untouched. Either USB
+   Mode works: this sketch uses nothing from the USB-OTG (On-The-Go) mode's
+   TinyUSB software. */
 #if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_USB_MODE) && !ARDUINO_USB_CDC_ON_BOOT
 #error "Set Tools -> USB CDC On Boot -> Enabled. The board's USB socket is the chip's own USB port; with this setting off, Serial prints to pins 43 and 44 instead and Serial Monitor stays empty."
 #endif
@@ -156,7 +159,7 @@ void setup() {
   pinMode(SAVE_BTN, INPUT_PULLUP);
 
   Wire.begin(SDA_PIN, SCL_PIN);
-  /* Try the other address before giving up. The ADR pad on the back of the
+  /* Try the other address before giving up. The ADR (address-select) pad on the back of the
      Adafruit board moves it from 0x28 to 0x29, boards ship both ways, and the
      failure message below names both -- so it has to actually try both, or it
      sends someone to reseat a cable that was never the problem. */
@@ -227,12 +230,15 @@ static void keep_instrument(void) {
     finish_report();
   }
   size_t n = iris_save(k, saved, sizeof saved);
-  if (n) { store.putBytes("inst", saved, n);
-           Serial.print(F("kept. ")); Serial.print((unsigned)n);
-           Serial.print(F(" bytes in flash, "));
-           Serial.print(iris_count(k)); Serial.print(F(" demonstrations, "));
-           Serial.println(iris_is_trained(k) ? F("trained.") : F("not trained -- it retrains after power-up.")); }
-  else     Serial.println(F("save refused -- iris_save returned 0."));
+  if (!n) { Serial.println(F("save refused -- iris_save returned 0.")); return; }
+  store.putBytes("inst", saved, n);
+  Serial.print(F("kept. ")); Serial.print((unsigned)n);
+  Serial.print(F(" bytes in flash, "));
+  Serial.print(iris_count(k));
+  Serial.print(iris_count(k) == 1 ? F(" demonstration, ") : F(" demonstrations, "));
+  if (iris_is_trained(k))      Serial.println(F("trained."));
+  else if (iris_count(k) >= 2) Serial.println(F("not trained -- it retrains after power-up."));
+  else                         Serial.println(F("not trained -- tap SAVE at a second pose to train it."));
 }
 
 #define HOLD_MS 1000
