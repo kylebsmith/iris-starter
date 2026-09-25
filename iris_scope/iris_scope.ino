@@ -91,9 +91,9 @@
    One input and two outputs, deliberately. One input is the smallest thing
    that still has an inside — you can draw its whole behaviour as a curve on
    a screen, which you cannot do once there are three or four. Two outputs is
-   the smallest number that makes the scope view interesting: one output is a
-   line, two is a shape. Keep them at 1 and 2: the reading, the targets and the
-   plot are written for exactly this shape. */
+   the smallest number that makes the square worth looking at: one output is
+   a line, two is a shape. Keep them at 1 and 2: the reading, the targets and
+   the plot are written for exactly this shape. */
 #define N_IN    1
 #define N_OUT   2
 #define N_HID  12
@@ -233,8 +233,9 @@ static void check_spread(void) {
    demonstrations (device_torture test 5 times it), and the live dot would
    freeze -- in a sketch whose whole purpose is watching the mapping form,
    that is the worst possible moment to stop drawing. iris_train_begin +
-   iris_train_slice do the identical fit in pieces, bit for bit, with a
-   prediction between slices or not; the library's tests/train.c checks it. */
+   iris_train_slice do the identical fit in pieces, bit for bit; the
+   library's tests/train.c checks that over several shapes, seeds and slice
+   sizes. */
 static bool training = false;
 
 static void retrain_and_redraw(void) {

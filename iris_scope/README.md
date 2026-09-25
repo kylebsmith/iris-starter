@@ -124,4 +124,4 @@ come out slightly more accurate than one, because every demonstration teaches
 all eight at once. Outputs you want to move **independently** are expensive:
 eight of them need roughly eight times the demonstrations, because each one
 asks a separate question. The numbers, and the program that produces them,
-are in iris-studies S05 (https://github.com/kylebsmith/iris-studies).
+are in iris-studies S05 (https://github.com/kylebsmith/iris-studies/tree/v1).

@@ -11,20 +11,24 @@ Instrument Digital Interface, the message format synthesisers understand). It
 sends three CC messages (control change: a numbered controller set to a value
 from 0 to 127): controllers 1, 2 and 3 on channel 1, one per bar on the
 screen, each time a value changes. Build and upload it with the settings in
-GET-STARTED.md, step 4; USB Mode must be USB-OTG (TinyUSB).
+GET-STARTED.md, step 4. USB Mode must be **USB-OTG (TinyUSB)**, as the Tools
+menu writes it: OTG is On-The-Go, the chip's full USB controller, and TinyUSB
+the software that drives it.
 
 To see it on the computer:
 
 - **Mac:** open Audio MIDI Setup (Applications → Utilities), then
   **Window → Show MIDI Studio**. The board is listed there while it is
-  plugged in.
+  plugged in. The Mac's MIDI system (CoreMIDI) names its MIDI input and
+  output `ESP32S3_DEV` ([board log](board-logs/2026-09-25-es3c28p.md)).
 - **Windows:** the board appears as a MIDI input in the settings of any music
   program.
 - **Linux:** `amidi -l` in a terminal lists it.
 
-The sketch leaves the names at the board package's defaults (esp32 3.3.3):
-the USB device is called `ESP32S3_DEV` and its MIDI port `TinyUSB MIDI`.
-Programs differ in which of the two they show.
+`ESP32S3_DEV` is the board package's default name (esp32 3.3.3), which the
+sketch leaves as it is. The MIDI interface inside the device has a second
+name, `TinyUSB MIDI`, which a music program may show instead; which name each
+program shows has not been tried.
 
 In a synthesiser, choose the board as the MIDI input, then assign controllers
 1, 2 and 3 to the sounds you want to move. Most synthesisers call this MIDI

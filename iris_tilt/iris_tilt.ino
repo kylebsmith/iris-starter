@@ -40,7 +40,7 @@
    serial-and-debug port: CDC, Communications Device Class, is the USB serial
    standard; JTAG, Joint Test Action Group, a debugging interface) it sets the
    chip's force-download flag and restarts, which the chip's built-in loader
-   reads at boot; that path is not yet tested on the board.
+   reads at boot.
 
    WHY THIS PRINTS INSTEAD OF SENDING MIDI
      Printing proves the learning works with nothing between the network and
@@ -78,7 +78,9 @@ static void restart_into_bootloader(void) {
   delay(100);
 #if ARDUINO_USB_MODE
   /* Hardware CDC and JTAG mode: the flag makes the next boot enter download
-     mode over the same USB port. Needs a test on the board. */
+     mode over the same USB port. Tested on the ES3C28P: after 'R' the chip's
+     loader reports a boot into download mode and esptool connects to it with
+     no button (board-logs/2026-09-25-es3c28p.md). */
   REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
   esp_restart();
 #else

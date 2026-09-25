@@ -123,8 +123,9 @@ off, and the error names the menu item to fix.
 a USB MIDI instrument (MIDI: Musical Instrument Digital Interface, the message
 format synthesisers understand) and needs USB-OTG (TinyUSB); it refuses to
 build in the other mode. Every other sketch also builds in Hardware CDC and
-JTAG mode, the board's default, but that mode is not yet tested on this board,
-so stay with the table.
+JTAG mode, the board's default, but only `iris_tilt` has been run in that
+mode on this board ([board log](board-logs/2026-09-25-es3c28p.md)), so stay
+with the table.
 
 `iris_tilt`, `iris_instrument`, `display_check` and `board_probe` also refuse
 to build if **Tools → Board** is another ESP32 entry. The rest are written to

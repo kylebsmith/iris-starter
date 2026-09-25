@@ -107,7 +107,8 @@ void setup() {
    for seconds at eight or more demonstrations on an ESP32-S3 (device_torture
    test 5 measures it on your board). iris_train_begin + iris_train_slice do
    the same fit in pieces and end bit-identical to iris_train, whatever the
-   slice size, with a prediction between slices or not.
+   slice size; the library's tests/train.c checks that over several shapes,
+   seeds and slice sizes.
    Same pattern as boilerplate/any_sensor. */
 static bool training = false;
 

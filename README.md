@@ -11,8 +11,8 @@ an ESP32-S3 (Espressif's microcontroller) with a touch screen.
 
 ## Start here
 
-Install and set up first: [GET-STARTED.md](GET-STARTED.md), steps 1 to 6.
-Then pick one:
+Start with [GET-STARTED.md](GET-STARTED.md), steps 1 to 6: install, set up
+and check the wiring. Then pick one:
 
 - **Watch a network learn** (the class demo): `iris_scope` and its Processing
   plot, [iris_scope/README.md](iris_scope/README.md).
@@ -31,22 +31,23 @@ Parts are in [PARTS.md](PARTS.md); getting sound out of any sketch is in
 
 I2C (inter-integrated circuit) is the two-wire bus the sensor talks on.
 
-In the order GET-STARTED.md runs them:
+In the order GET-STARTED.md runs them, numbered by its steps:
 
 ```
-i2c_find/                1. is the sensor wired right? lists every I2C address
-iris_tilt/               2. the first instrument: 3 poses, one number; learn it
-iris_scope/              3. see the curve the network invents
-  processing/               the plot it talks to, over the USB cable
-iris_instrument/         4. screen, touch and USB MIDI sound
+i2c_find/                6.  is the sensor wired right? lists every I2C address
+iris_tilt/               7.  the first instrument: 3 poses, one number; learn it
+iris_scope/              8.  see the curve the network invents
+  processing/                the plot it talks to, over the USB cable
+iris_instrument/         9.  screen, touch and USB MIDI sound
 boilerplate/
-  stemma_bno055/         5. sensor and knobs, and it survives a power cycle
+  stemma_bno055/         10. sensor and knobs, and it survives a power cycle
   any_sensor/            any sensor, any board: start here on another board
   bno055_portable/       a real motion sensor on boards other than the ES3C28P
 display_check/           check: does the screen draw and the touch report?
 determinism_check/       check: the same instrument as a laptop, bit for bit?
 device_torture/          check: saving, corrupt files, drift, on this board
 board_probe/             check: prediction and training time, measured
+board-logs/              checks on a real ES3C28P: which passed, which wait
 PARTS.md                 every part, its number, where to buy it, what goes where
 GET-STARTED.md           install, board settings, first upload, the walk
 SOUND.md                 from the board's outputs to a synthesiser, Max, Pure Data
@@ -54,22 +55,31 @@ TROUBLESHOOTING.md       symptom, likely cause, what to do
 TASKS.md                 what to pick up
 ```
 
-Compiler output for each, on the settings in GET-STARTED.md (esp32 board
+What the compiler reports for three of them, in thousands of bytes, from
+`arduino-cli compile` with the settings in GET-STARTED.md, step 4 (the
+`FQBN_DOCUMENTED` line of `.github/workflows/sketches.yml`; esp32 board
 package 3.3.3):
 
 | sketch | flash (program storage) | RAM (random-access memory, the working memory) |
 |---|---|---|
-| `iris_tilt` | 404,263 B (12%) | 46,368 B (14%) |
-| `display_check` | 409,519 B (13%) | 45,520 B (13%) |
-| `iris_instrument` | 423,619 B (13%) | 47,264 B (14%) |
+| `iris_tilt` | about 404 (12%) | about 46 (14%) |
+| `display_check` | about 409 (13%) | about 46 (13%) |
+| `iris_instrument` | about 424 (13%) | about 47 (14%) |
 
-Almost all of that is the Arduino and USB runtime. iris itself is a few
-kilobytes: `iris_tilt`'s whole instrument — weights, demonstrations and all —
-is its 944-byte `memory` array, `IRIS_ARENA(2, 12, 1, 8)`. That figure is a
-compile-time assertion with the ESP32-S3's own compiler
-(xtensa-esp32s3-elf-gcc 14.2.0); the same macro gives 1,024 bytes on a 64-bit
-laptop (Apple clang and gcc 15 on a 64-bit Arm processor), because pointers
-there are twice as wide.
+The percentages are the ones arduino-cli prints, rounded down. The workflow
+prints the exact byte counts on every run. They move a little with the
+Adafruit library versions, with how the board options are spelled and with
+the operating system that builds them, because the board package compiles
+the option text and that system's name into the program (`-DARDUINO_FQBN`
+and `-DARDUINO_HOST_OS` in its `platform.txt`).
+
+Almost all of each figure in the table is the Arduino and USB runtime. iris
+itself is a few kilobytes: `iris_tilt`'s whole instrument — weights,
+demonstrations and all — is its 944-byte `memory` array,
+`IRIS_ARENA(2, 12, 1, 8)`. That figure is a compile-time assertion with the
+ESP32-S3's own compiler (xtensa-esp32s3-elf-gcc 14.2.0); the same macro gives
+1,024 bytes on a 64-bit laptop (Apple clang and gcc 15 on a 64-bit Arm
+processor), because pointers there are twice as wide.
 
 ---
 
@@ -108,6 +118,10 @@ less consistent than anything it was tuned against.
 
 **Doesn't prove:** that the mapping is any good musically. That isn't a
 software question. You answer it by playing.
+
+What five of the sketches did on an ES3C28P, and which checks, for those and
+for `boilerplate/stemma_bno055`, still wait for a person:
+[board-logs/2026-09-25-es3c28p.md](board-logs/2026-09-25-es3c28p.md).
 
 ## Two libraries, two different risks
 
