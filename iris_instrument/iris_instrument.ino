@@ -5,19 +5,26 @@
    RECORD. Do that a few times. It learns the mapping, and then one tilt moves
    all three parameters together, in the relationship you showed it.
 
+   The parameters go out as MIDI (Musical Instrument Digital Interface, the
+   message format synthesisers understand) over the USB (Universal Serial
+   Bus) cable: three CC messages (control change, a numbered controller set
+   to a value from 0 to 127), so any synthesiser that accepts USB MIDI can
+   play it.
+
    ---------------------------------------------------------------------------
    LIBRARIES   Install from Tools -> Manage Libraries:
                  Adafruit BNO055 · Adafruit GFX Library · Adafruit ILI9341
-               Installing those three also pulls in Adafruit BusIO and
-               Adafruit Unified Sensor. SPI, Wire, USB and USBMIDI already come
-               with the ESP32 board package — do not install those separately.
+               Say yes when it offers their dependencies (GET-STARTED.md,
+               step 3). SPI, Wire, USB and USBMIDI already come with the ESP32
+               board package — do not install those separately.
 
                iris.h is in this folder. It is the one thing here with no
                dependencies at all, and that is the point: display and sensor
                drivers are replaceable plumbing, but the code that decides how
                your gesture becomes sound should never change under you.
 
-   BOARD SETTINGS   Tools -> ESP32S3 Dev Module, then:
+   BOARD SETTINGS   Tools -> ESP32S3 Dev Module, then (GET-STARTED.md, step 4,
+   explains each one):
      USB Mode            USB-OTG (TinyUSB)      <- MIDI does not exist without this
      USB CDC On Boot     Enabled                <- or Serial never appears
      Flash Size          16MB (128Mb)
@@ -26,7 +33,8 @@
 
    IF THE BOARD STOPS ACCEPTING UPLOADS
      Send 'R' over Serial, or CC 123 value 127 on MIDI channel 16. Either one
-     reboots it into the bootloader. Failing both: unplug and replug.
+     reboots it into the bootloader. Failing both: hold BOOT, tap RESET,
+     release BOOT, then upload.
    =========================================================================== */
 
 #include <SPI.h>
@@ -36,9 +44,10 @@
 #include <Adafruit_BNO055.h>
 /* The board settings that fail SILENTLY if you get them wrong: the wrong
    USB Mode compiles fine and then the board never appears as a MIDI device,
-   and CDC off gives you a board that runs but cannot talk to you. Neither
-   produces an error on its own, so here is the error. These come before the
-   USB includes, which do not exist for other boards. */
+   and USB CDC On Boot off (CDC, Communications Device Class, is the USB
+   serial-port standard) gives you a board that runs but cannot talk to you.
+   Neither produces an error on its own, so here is the error. These come
+   before the USB includes, which do not exist for other boards. */
 #if defined(ARDUINO_ARCH_ESP32) && !defined(CONFIG_IDF_TARGET_ESP32S3)
 #error "This sketch is for the ESP32-S3 display board. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module, then set the board options in GET-STARTED.md."
 #endif
@@ -63,7 +72,9 @@
    this is the only block you should need to touch.
    =========================================================================== */
 
-/* ES3C28P board: ESP32-S3, 240x320 ILI9341 panel, FT6336 capacitive touch. */
+/* ES3C28P board: ESP32-S3, 240x320 ILI9341 panel driven over SPI (serial
+   peripheral interface, the fast four-wire bus screens use), FT6336
+   capacitive touch. */
 #define LCD_CS   10
 #define LCD_DC   46
 #define LCD_BL   45
@@ -76,7 +87,7 @@
 #define SCL_PIN   15
 #define TOUCH_ADDR 0x38
 
-/* The BNO055 answers at 0x28, or 0x29 if the ADR pad on the breakout is
+/* The BNO055 answers at 0x28, or 0x29 if the ADR (address-select) pad on the breakout is
    bridged. We try both rather than telling you the cable is loose. */
 #define BNO_ADDR_A 0x28
 #define BNO_ADDR_B 0x29
@@ -248,13 +259,23 @@ static void reboot_to_bootloader() {
   usb_persist_restart(RESTART_BOOTLOADER);
 }
 
+/* A failure goes to the screen AND to Serial Monitor, repeated every two
+   seconds so a monitor opened late still sees it: a dead screen must not
+   leave the board silent. Each line fits the panel at text size 2 (19
+   characters from x = 10). 'R' still restarts into the bootloader. */
 static void fail(const char *line1, const char *line2) {
   tft.fillScreen(ILI9341_BLACK);
   tft.setTextColor(ILI9341_WHITE);
   tft.setTextSize(2);
   tft.setCursor(10, 140); tft.print(line1);
   tft.setCursor(10, 168); tft.print(line2);
-  for (;;) delay(500);
+  for (;;) {
+    Serial.print("STOPPED: "); Serial.print(line1); Serial.print(" "); Serial.println(line2);
+    for (int i = 0; i < 200; ++i) {
+      while (Serial.available()) if (Serial.read() == 'R') reboot_to_bootloader();
+      delay(10);
+    }
+  }
 }
 
 void setup() {
@@ -276,11 +297,11 @@ void setup() {
   if (!bno.begin()) {
     bno = Adafruit_BNO055(55, BNO_ADDR_B, &Wire);
     if (!bno.begin())
-      fail("No BNO055 at 0x28/0x29.", "Check STEMMA cable");
+      fail("No BNO055 found.", "See PARTS.md wiring");
   }
 
   k = iris_init(arena, sizeof arena, N_IN, N_HID, NOUT, MAXEX, /*seed=*/1234);
-  if (!k) fail("iris_init refused.", "Arena too small");
+  if (!k) fail("iris_init refused:", "arena too small");
 
   screen();
 }
