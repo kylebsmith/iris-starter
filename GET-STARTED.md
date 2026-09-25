@@ -106,9 +106,11 @@ first five.
 | Flash Size | **16MB (128Mb)** | The board's flash memory chip: 16 megabytes. |
 | PSRAM | **OPI PSRAM** | PSRAM (pseudo-static random-access memory) is the board's extra memory chip; OPI (octal peripheral interface) is the 8-wire link to it. |
 | Partition Scheme | **16M Flash (3MB APP/9.9MB FATFS)** | How the flash is divided: 3 MB for your sketch (the app), 9.9 MB for files (FATFS: a FAT file system). |
+| Upload Mode | **USB-OTG CDC (TinyUSB)** | How the computer puts the board into its loader before an upload. With the USB mode above, a sketch owns the USB port, and this choice makes the upload tap the port at 1200 baud (bits per second) so the sketch restarts into the loader by itself. The other choice, UART0 / Hardware CDC, cannot reach a board running a TinyUSB sketch: the upload stops with `Failed to connect to ESP32-S3: No serial data received`. |
 
-This combination is the one tested on this board. **Only the first two
-change whether a sketch works;** the other three match the board's memory and
+This combination is the one tested on this board. **The first two change
+whether a sketch works, and Upload Mode decides whether the second and later
+uploads start by themselves;** the other three match the board's memory and
 leave room to grow.
 
 *USB CDC On Boot = Disabled* gives you a board that runs fine and cannot talk
