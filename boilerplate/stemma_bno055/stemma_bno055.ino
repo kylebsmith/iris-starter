@@ -12,14 +12,28 @@
    when it offers its dependencies. A different sensor means a different
    library, and its own example will show you the two lines to change.
 
-   Pose the board. Turn the knobs until it sounds right. Press SAVE.
+   Pose the board. Turn the knobs until it sounds right. Tap SAVE.
    Twice, and it plays.
 
-   AND IT SURVIVES BEING UNPLUGGED. Hold SAVE for a second and the instrument
-   is written to flash; it comes back by itself on the next power-up. The other
-   sketches deliberately do not save, so that the first file you read is as
-   short as it can be -- this is the one to copy the two calls out of when you
-   want an instrument to outlive the cable.
+   AND IT SURVIVES BEING UNPLUGGED. The SAVE button does two things:
+
+     tap  (let go within a second)  records one demonstration: the pose and
+                                    the knobs as they were when you pressed,
+                                    then starts training in the background.
+     hold (a second or longer)      records nothing. It finishes any training
+                                    still running, then writes the instrument
+                                    you are playing -- every demonstration and
+                                    the trained network -- to flash.
+
+   On the next power-up the sketch loads it and plays exactly what you were
+   playing when you held SAVE. If the saved instrument was not trained (it had
+   fewer than two demonstrations, or its training failed), it retrains from
+   the saved demonstrations as soon as it has loaded them.
+
+   The other sketches deliberately do not save, so that the first file you
+   read is as short as it can be -- this is the one to copy the two calls
+   (iris_save and iris_load) out of when you want an instrument to outlive the
+   cable.
 
    THIS FILE NEEDS AN ESP32. Two things in it are Espressif-only: Preferences.h,
    which is how this chip writes to its own flash, and Wire.begin(SDA, SCL),
@@ -88,6 +102,34 @@ static unsigned char memory[IRIS_ARENA(N_INPUTS, 12, N_OUTPUTS, N_DEMOS)];
 static unsigned char saved[sizeof memory];
 static iris *k;
 
+/* TRAINING IN SLICES, so the instrument never goes deaf. iris_train() blocks
+   for seconds at eight or more demonstrations on this board (device_torture
+   test 5 measures it), and an instrument that stops responding for seconds
+   after every take is not an instrument. iris_train_begin + iris_train_slice
+   do the same fit in pieces and end bit-identical to iris_train.
+   See boilerplate/any_sensor for the same pattern. */
+static bool training = false;
+
+static void start_training(void) {
+  if (!iris_train_begin(k, 0)) { Serial.println(F("TRAINING REFUSED.")); return; }
+  training = true;
+  Serial.println(F("learning -- keep moving it, it stays alive."));
+}
+
+static void finish_report(void) {
+  training = false;
+  if (iris_is_trained(k)) Serial.println(F("trained."));
+  else { Serial.print(F("TRAINING FAILED -- status "));
+         Serial.println((int)iris_get_status(k)); }
+}
+
+static void keep_training(void) {
+  if (!training) return;
+  iris_train_slice(k, 64);
+  if (iris_train_busy(k)) return;
+  finish_report();
+}
+
 void setup() {
   Serial.begin(115200);
   delay(400);
@@ -129,67 +171,70 @@ void setup() {
         Serial.println(F("the saved instrument is damaged; starting fresh."));
     } }
 
-  Serial.println(F("ready. tilt the board, set the knobs, press SAVE."));
-  Serial.println(F("hold SAVE for a second to keep it through a power cycle."));
+  Serial.println(F("ready. tilt the board, set the knobs, tap SAVE to record."));
+  Serial.println(F("hold SAVE for a second to keep the instrument through a power cycle."));
+
+  /* A saved instrument that was not trained still holds its demonstrations:
+     train it now, so it plays them rather than one constant. */
+  if (!iris_is_trained(k) && iris_count(k) >= 2) start_training();
 }
 
-/* TRAINING IN SLICES, so the instrument never goes deaf. iris_train() blocks
-   for 2.7-3.0 seconds at eight or more demonstrations on this board -- measured
-   -- and an instrument that stops responding for three seconds after every
-   take is not an instrument. iris_train_begin + iris_train_slice do the
-   identical fit in pieces: verified bit-identical at 4, 12 and 20
-   demonstrations, including with a prediction between every slice.
-   The reseed is what keeps them identical; iris_train() does it first and
-   iris_train_begin does not. See boilerplate/any_sensor for the same pattern. */
-static bool training = false;
-
-static void start_training(void) {
-  iris_reseed(k, iris_seed(k));
-  if (!iris_train_begin(k, 0)) { Serial.println(F("TRAINING REFUSED.")); return; }
-  training = true;
-  Serial.println(F("learning -- keep moving it, it stays alive."));
+/* A TAP: store the demonstration read when the button went down. */
+static void record_take(const float *in, const float *out) {
+  /* Ask WHY it refused. There are three reasons and they need three
+     different fixes; printing "full" for all of them sends a student to
+     delete demonstrations they may not even have. */
+  if (!iris_record(k, in, out)) {
+    if (iris_get_status(k) == IRIS_STORE_FULL)
+      Serial.println(F("full -- no room for more demonstrations"));
+    else
+      Serial.println(F("refused: a reading or a target is not a number. "
+                       "Check the sensor cable and check read_target."));
+  }
+  else if (iris_count(k) >= 2) start_training();
+  Serial.print(F("demonstrations: ")); Serial.println(iris_count(k));
 }
 
-static void keep_training(void) {
-  if (!training) return;
-  iris_train_slice(k, 64);
-  if (iris_train_busy(k)) return;
-  training = false;
-  if (iris_is_trained(k)) Serial.println(F("trained."));
-  else { Serial.print(F("TRAINING FAILED -- status "));
-         Serial.println((int)iris_get_status(k)); }
+/* A HOLD: save the instrument being played. A run still in progress is
+   finished first, so the file holds the trained network, never a half-trained
+   one. Nothing is recorded, so nothing is retrained. */
+static void keep_instrument(void) {
+  if (iris_count(k) < 1) { Serial.println(F("nothing to keep yet -- tap SAVE to record first.")); return; }
+  if (training) {
+    Serial.println(F("finishing training before saving..."));
+    while (iris_train_slice(k, 256)) { }
+    finish_report();
+  }
+  size_t n = iris_save(k, saved, sizeof saved);
+  if (n) { store.putBytes("inst", saved, n);
+           Serial.print(F("kept. ")); Serial.print((unsigned)n);
+           Serial.print(F(" bytes in flash, "));
+           Serial.print(iris_count(k)); Serial.print(F(" demonstrations, "));
+           Serial.println(iris_is_trained(k) ? F("trained.") : F("not trained -- it retrains after power-up.")); }
+  else     Serial.println(F("save refused -- iris_save returned 0."));
 }
+
+#define HOLD_MS 1000
 
 void loop() {
   float in[N_INPUTS], out[N_OUTPUTS];
   read_sensor(in);
 
   if (digitalRead(SAVE_BTN) == LOW) {
-    read_target(out);
-    /* Ask WHY it refused. There are three reasons and they need three
-       different fixes; printing "full" for all of them sends a student to
-       delete demonstrations they may not even have. */
-    if (!iris_record(k, in, out)) {
-      if (iris_get_status(k) == IRIS_STORE_FULL)
-        Serial.println(F("full -- no room for more demonstrations"));
-      else
-        Serial.println(F("refused: a reading or a target is not a number. "
-                         "Check the STEMMA cable and check read_target."));
+    /* Read the demonstration now, while the pose and knobs are where the
+       student set them, then wait to see whether this is a tap or a hold. */
+    float take_in[N_INPUTS], take_out[N_OUTPUTS];
+    for (int i = 0; i < N_INPUTS; ++i) take_in[i] = in[i];
+    read_target(take_out);
+    uint32_t pressed = millis();
+    while (digitalRead(SAVE_BTN) == LOW && millis() - pressed < HOLD_MS) delay(10);
+    if (digitalRead(SAVE_BTN) == LOW) {
+      keep_instrument();
+      while (digitalRead(SAVE_BTN) == LOW) delay(10);   /* wait for the release */
+    } else {
+      record_take(take_in, take_out);
     }
-    else if (iris_count(k) >= 2) start_training();
-    Serial.print(F("demonstrations: ")); Serial.println(iris_count(k));
-
-    /* Held down? Keep it. */
-    uint32_t held = millis();
-    while (digitalRead(SAVE_BTN) == LOW && millis() - held < 1200) delay(10);
-    if (millis() - held >= 1000 && iris_count(k) >= 2) {
-      size_t n = iris_save(k, saved, sizeof saved);
-      if (n) { store.putBytes("inst", saved, n);
-               Serial.print(F("kept. ")); Serial.print((unsigned)n);
-               Serial.println(F(" bytes in flash.")); }
-      else     Serial.println(F("save refused -- iris_save returned 0."));
-    }
-    delay(300);
+    delay(50);                                          /* debounce the release */
   }
 
   keep_training();   /* a slice per pass, free when idle */
