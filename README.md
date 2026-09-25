@@ -2,20 +2,34 @@
 
 Tilt the board. It learns what you meant. Then it plays.
 
-Eleven sketches, the iris library (version 0.2.0, from
+Arduino sketches, the iris library (version 0.2.0, from
 https://github.com/kylebsmith/iris) copied into each sketch that uses it, and
 a walkthrough. It exists so you can get a trained model running on real
-hardware in about twenty minutes and see the thing work before anyone asks you
-to understand it. The board is LCDWIKI's ES3C28P: an ESP32-S3 (Espressif's
-microcontroller) with a touch screen.
+hardware in about twenty minutes, most of it downloading, and see the thing
+work before anyone asks you to understand it. The board is LCDWIKI's ES3C28P:
+an ESP32-S3 (Espressif's microcontroller) with a touch screen.
 
-**Start at [GET-STARTED.md](GET-STARTED.md).** Parts are in
-[PARTS.md](PARTS.md); when something goes wrong, see
+## Start here
+
+Install and set up first: [GET-STARTED.md](GET-STARTED.md), steps 1 to 6.
+Then pick one:
+
+- **Watch a network learn** (the class demo): `iris_scope` and its Processing
+  plot, [iris_scope/README.md](iris_scope/README.md).
+- **Play by tilting:** `iris_tilt`, [GET-STARTED.md](GET-STARTED.md) step 7.
+- **Plug in your own sensor:** `boilerplate/any_sensor`; fill in the places
+  marked FILL THIS IN.
+- **A USB MIDI controller for a synthesiser:** `iris_instrument`,
+  [SOUND.md](SOUND.md) (USB: Universal Serial Bus; MIDI: Musical Instrument
+  Digital Interface, the message format synthesisers understand).
+
+Parts are in [PARTS.md](PARTS.md); getting sound out of any sketch is in
+[SOUND.md](SOUND.md); when something goes wrong, see
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
-I2C (inter-integrated circuit) is the two-wire bus the sensor talks on; USB is
-Universal Serial Bus; MIDI (Musical Instrument Digital Interface) is the
-message format synthesisers understand.
+## What is here
+
+I2C (inter-integrated circuit) is the two-wire bus the sensor talks on.
 
 In the order GET-STARTED.md runs them:
 
@@ -31,10 +45,11 @@ boilerplate/
   bno055_portable/       a real motion sensor on boards other than the ES3C28P
 display_check/           check: does the screen draw and the touch report?
 determinism_check/       check: the same instrument as a laptop, bit for bit?
-device_torture/          check: nine questions of the library on this board
+device_torture/          check: saving, corrupt files, drift, on this board
 board_probe/             check: prediction and training time, measured
 PARTS.md                 every part, its number, where to buy it, what goes where
 GET-STARTED.md           install, board settings, first upload, the walk
+SOUND.md                 from the board's outputs to a synthesiser, Max, Pure Data
 TROUBLESHOOTING.md       symptom, likely cause, what to do
 TASKS.md                 what to pick up
 ```
@@ -60,11 +75,10 @@ there are twice as wide.
 
 ## What the first sketch does
 
-Read it top to bottom. It's short on purpose and I want you to follow every
-line.
+Read it top to bottom. It is short so that you can follow every line.
 
-**It reads the gravity vector off the sensor** over I2C, the two-wire bus
-that carries data and clock on two pins, using the Adafruit BNO055 library. Gravity, not orientation in degrees — Euler angles wrap from
+**It reads the gravity vector off the sensor** over I2C, using the Adafruit
+BNO055 library. Gravity, not orientation in degrees — Euler angles wrap from
 +180 to −180, and two poses a degree apart then arrive as opposite ends of the
 range. Nothing smooth can fit that. Gravity points down and never wraps.
 
@@ -92,8 +106,8 @@ with a human doing the demonstrating. Every accuracy number in the library was
 measured on clean synthetic data at a desk, and real gestures are noisier and
 less consistent than anything it was tuned against.
 
-**Doesn't prove:** that the mapping is any good musically. That isn't a software
-question and I can't answer it for you. You have to play it.
+**Doesn't prove:** that the mapping is any good musically. That isn't a
+software question. You answer it by playing.
 
 ## Two libraries, two different risks
 
@@ -137,22 +151,22 @@ a number on a screen. What's obviously missing is missing on purpose.
   the whole instrument, how well it predicts takes it did not see. It
   retrains the instrument while it works, so call `iris_train` afterwards.
 
-## What this repo is holding itself to
+## What this repo holds itself to
 
-These were agreed before any of it was built, and they are the standard to
-judge a change against:
+The standard to judge a change against:
 
 - One clone. No submodules, no package manager, no build script to read first.
 - Opens in the Arduino IDE (integrated development environment).
 - A wrong board setting produces a **compiler error with a human message**,
   never a bricked board. Every sketch stops at compile time when USB CDC On
-  Boot (the setting that makes the USB socket the serial port) is off on the
-  ESP32-S3; `iris_tilt`, `iris_instrument`,
+  Boot (CDC: Communications Device Class; the setting makes the USB socket the
+  serial port) is off on the ESP32-S3; `iris_tilt`, `iris_instrument`,
   `display_check` and `board_probe`, which use this board's own pins or
   timer, stop when the board entry is another ESP32; `iris_instrument` stops
-  when USB Mode is not USB-OTG (On-The-Go, driven by TinyUSB). Each message names the menu item
-  and says why.
-- First sound in under fifteen minutes, from zero prior experience.
+  when USB Mode is not USB-OTG (On-The-Go, driven by TinyUSB). Each message
+  names the menu item and says why.
+- A first sound from zero prior experience, by following GET-STARTED.md from
+  the top.
 - Everything you add is a module behind the existing interface. The core is
   frozen and is not yours to edit.
 
@@ -171,7 +185,8 @@ would? Same standard whether a person or a model wrote the line.
 
 ## Licence
 
-BSD 3-Clause — see [LICENSE](LICENSE). The copies of `iris.h` in the sketch
+BSD 3-Clause (BSD: Berkeley Software Distribution, the licence's origin) —
+see [LICENSE](LICENSE). The copies of `iris.h` in the sketch
 folders are the same file under the same terms, kept in step by `sync-iris.sh`
 (`sh sync-iris.sh` checks them against the library, `--fix` re-copies).
 Use, change and redistribute the sketches freely; that is what they are for.

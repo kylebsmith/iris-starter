@@ -4,20 +4,22 @@ Goal: a sensor on your desk controlling a number, learned from three
 demonstrations you gave it, in about twenty minutes. Most of that is
 downloading.
 
-Work top to bottom. If something doesn't match what you see on screen, that's
-worth telling me — these instructions are only as good as the last person who
-followed them. When something goes wrong, [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-lists each symptom, its likely cause and what to do.
+Work top to bottom. If something doesn't match what you see on screen, say
+so: these instructions are only as good as the last person who followed them.
+When something goes wrong, [TROUBLESHOOTING.md](TROUBLESHOOTING.md) lists each
+symptom, its likely cause and what to do.
 
-The order of this page is the order to run the sketches in:
+Steps 1 to 5 install and set up. After that, the order of this page is the
+order to run the sketches in:
 
-1. `i2c_find` — is the sensor wired right?
-2. `iris_tilt` — the first instrument: tilt, teach three poses, play
-3. `iris_scope` — see the mapping the network invents, drawn as a curve
-4. `iris_instrument` — the same learning with a screen and sound: MIDI
-   (Musical Instrument Digital Interface, the message format synthesisers
-   understand) over the USB (Universal Serial Bus) cable
-5. `boilerplate/stemma_bno055` — an instrument that survives a power cycle
+- step 6, `i2c_find` — is the sensor wired right?
+- step 7, `iris_tilt` — the first instrument: tilt, teach three poses, play
+- step 8, `iris_scope` — see the mapping the network invents, drawn as a curve
+- step 9, `iris_instrument` — the same learning with a screen and sound: MIDI
+  (Musical Instrument Digital Interface, the message format synthesisers
+  understand) over the USB (Universal Serial Bus) cable
+- step 10, `boilerplate/stemma_bno055` — an instrument that survives a power
+  cycle
 
 `boilerplate/any_sensor` is the starting point on any other board.
 `display_check`, `determinism_check`, `device_torture` and `board_probe` are
@@ -105,8 +107,8 @@ first five.
 | USB CDC On Boot | **Enabled** | Makes the board's USB socket the serial port Serial Monitor reads. |
 | Flash Size | **16MB (128Mb)** | The board's flash memory chip: 16 megabytes. |
 | PSRAM | **OPI PSRAM** | PSRAM (pseudo-static random-access memory) is the board's extra memory chip; OPI (octal peripheral interface) is the 8-wire link to it. |
-| Partition Scheme | **16M Flash (3MB APP/9.9MB FATFS)** | How the flash is divided: 3 MB for your sketch (the app), 9.9 MB for files (FATFS: a FAT file system). |
-| Upload Mode | **USB-OTG CDC (TinyUSB)** | How the computer puts the board into its loader before an upload. With the USB mode above, a sketch owns the USB port, and this choice makes the upload tap the port at 1200 baud (bits per second) so the sketch restarts into the loader by itself. The other choice, UART0 / Hardware CDC, cannot reach a board running a TinyUSB sketch: the upload stops with `Failed to connect to ESP32-S3: No serial data received`. |
+| Partition Scheme | **16M Flash (3MB APP/9.9MB FATFS)** | How the flash is divided: 3 MB for your sketch (the app), 9.9 MB for files (FATFS: a FAT file system; FAT, file allocation table, is the format memory cards use). |
+| Upload Mode | **USB-OTG CDC (TinyUSB)** | How the computer puts the board into its loader before an upload. With the USB mode above, a sketch owns the USB port, and this choice makes the upload tap the port at 1200 baud (bits per second) so the sketch restarts into the loader by itself. The other choice, UART0 / Hardware CDC (UART: universal asynchronous receiver-transmitter, the chip's plain serial port), cannot reach a board running a TinyUSB sketch: the upload stops with `Failed to connect to ESP32-S3: No serial data received`. |
 
 This combination is the one tested on this board. **The first two change
 whether a sketch works, and Upload Mode decides whether the second and later
@@ -173,7 +175,7 @@ tilt, then press BOOT -- or send any key here except R  ->  demo 1 of 3 (target 
 3. A third pose. Press **BOOT**. That's `127`.
 
 Can't reach BOOT? Type a character into Serial Monitor and hit send — that
-records too, and `c` clears.
+records too. To start over, send `c`, or hold BOOT for two seconds.
 
 **One exception: a capital `R` restarts the board into its loader** rather
 than recording: it is the escape hatch in TROUBLESHOOTING.md for a board that
@@ -197,19 +199,25 @@ network invented between them. Upload `iris_scope.ino`, **close Serial
 Monitor**, then run `iris_scope/processing/iris_scope/iris_scope.pde` in
 Processing. [iris_scope/README.md](iris_scope/README.md) walks through it.
 
-Both views are on screen at once. TRANSFER shows what it plays against what you
-did. SCOPE plots the two outputs against each other like an oscilloscope, which
-is where the nonlinearity becomes a shape you can see. Press `d` and the last
-demonstration leaves the picture and the curve relaxes.
+Both views are on screen at once. The big plot shows what it plays against
+where the sensor is. The square at the top right plots the two outputs against
+each other like an oscilloscope, which is where the nonlinearity becomes a
+shape you can see. Press `d` and the last demonstration leaves the picture and
+the curve relaxes.
 
 ## 9. Sound: `iris_instrument`
 
 `iris_instrument/iris_instrument.ino` is the same learning core with a screen
 and USB MIDI. You drag three bars to set a sound, hold a pose, tap RECORD, and
 after two demonstrations it plays — one tilt moving three parameters together
-in the relationship you showed it. It shows up as a MIDI device in any
-synthesiser or music program that accepts USB MIDI. Same board settings, no
-new libraries.
+in the relationship you showed it. Tap CLR to start over. Same board settings,
+no new libraries.
+
+The bars go out as MIDI controllers 1, 2 and 3 on channel 1, to any
+synthesiser or music program that accepts USB MIDI.
+[SOUND.md](SOUND.md) says how to find the board on your computer, and how to
+get sound from the other sketches, which print their outputs as plain text
+that Max, Pure Data or Processing can read.
 
 ## 10. Keeping an instrument: `boilerplate/stemma_bno055`
 
@@ -257,8 +265,10 @@ when you want an instrument to outlive the cable.
 ## Fixing a bad demonstration
 
 If you record a pose you did not mean, you do not start over.
-`boilerplate/any_sensor/` and `iris_scope` take **`d`** in the Serial Monitor
-to delete the last demonstration and retrain, and **`c`** to clear everything.
+`boilerplate/any_sensor/` and `iris_scope` take **`d`** to delete the last
+demonstration and retrain, and **`c`** to clear everything (in the Serial
+Monitor for `any_sensor`, in the plot window for `iris_scope`). `iris_tilt`
+clears with `c`, and `iris_instrument` with its CLR button.
 That loop — demonstrate, listen, delete the bad one, demonstrate again — is the
 point of teaching by showing rather than by typing numbers.
 
@@ -287,12 +297,13 @@ for boards other than the ES3C28P that have more memory than an Uno.
   interesting.
 - `determinism_check` trains a fixed recipe and prints PASS when the board
   builds exactly the instrument a laptop builds, bit for bit.
-- `device_torture` asks nine questions of the library on this board — same
-  bits as the laptop, saving through real flash, corrupted files refused,
-  drift, several instruments at once — and prints PASS, FAIL or a labelled
-  figure for each.
+- `device_torture` asks the library questions on this board — same bits as
+  the laptop, saving through real flash, corrupted files refused, drift,
+  several instruments at once — and prints PASS, FAIL or a labelled figure
+  for each.
 - `board_probe` measures how long one prediction and each kind of training
-  take on this board, properly, and prints one block to keep as a record.
+  take on this board, with the processor's cycle counter, and prints one
+  block to keep as a record.
 
 ## Where the rest of it lives
 
@@ -302,5 +313,5 @@ version 0.2.0):
 
 - `iris.h` — the library, and the place the mathematics is written down
 - `examples/` — programs that run on a laptop with no board at all
-- `docs/adr/` — numbered decision records, each with the measurement behind
-  it. If you ever wonder "why is it like that", the answer is there.
+- the library's decision records, each with the measurement behind it: where
+  to look when you wonder "why is it like that".
