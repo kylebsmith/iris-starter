@@ -22,8 +22,9 @@ what would you try? One paper. Not a literature review — I'll give you the lis
 
 ## Week 2 — the one that makes the point
 
-**Try to install a dead tool.** Pick one from the list I'll hand out — MnM,
-GRT, an old Wekinator example patch. Try to build and run it. Write down exactly
+**Try to install a dead tool.** Pick one from the list I'll hand out — MnM
+(the Mapping is not Music toolkit for Max), GRT (the Gesture Recognition
+Toolkit), an old Wekinator example patch. Try to build and run it. Write down exactly
 what broke and how far you got.
 *Needs: none, and stubbornness helps.*
 
@@ -37,9 +38,10 @@ in whatever error message you end up staring at.
 
 Pick one. These start from `iris_tilt`, which is deliberately at its floor.
 
-Three things that used to be on this list — more outputs, real MIDI, using the
-screen — are now already done in `iris_instrument`. That does not remove them
-from the list. **Read that sketch, then do it yourself to `iris_tilt` without
+Three of these — more outputs, real MIDI (Musical Instrument Digital
+Interface, the message format synthesisers understand), using the screen —
+are already done in `iris_instrument`. That does not remove them from the
+list. **Read that sketch, then do it yourself to `iris_tilt` without
 copying it**, and you will find out how much of it you actually understood.
 Doing it from scratch is the task; the working version is the answer key, and
 looking at the answer key first is how you learn nothing.
@@ -57,16 +59,16 @@ your sensor. Remember iris fits its range to your demonstrations, so you do not
 need to scale or centre anything first.
 
 **Show the learned space.** `iris_instrument` draws three bars. Draw the actual
-surface instead — the whole 2D input space coloured by what it would output.
+surface instead — the whole two-dimensional input space coloured by what it
+would output.
 *Needs: some graphics interest.* Done when you can see the mapping while you
 train it, and it changes how training feels.
 
 **Break it on purpose.** Record contradictory demonstrations, feed it garbage,
 unplug the sensor mid-training, record all sixteen and then try a seventeenth.
 Write down everything that fails badly or fails *silently*. *Needs: none. This
-is genuinely valuable and nobody wants to do it.* The last audit of this repo
-found a button that recorded a value you could neither see nor hear; that is
-the class of bug I want you hunting.
+is genuinely valuable and nobody wants to do it.* A button that records a
+value you can neither see nor hear is the class of bug I want you hunting.
 
 ---
 

@@ -82,8 +82,8 @@
    outer legs take 3.3 V and ground from elsewhere (see PARTS.md).
    CHECK ON THE BOARD: that the socket's pins are in this order and that
    GPIO 14 reads a knob's full travel (the second converter is not used by
-   anything else in these sketches). The pins 4, 5 and 6 used before are the
-   board's audio lines and reach no connector. */
+   anything else in these sketches). GPIO 4, 5 and 6 are the board's audio
+   lines and reach no connector. */
 static const int POT_PIN[] = { 2, 3, 14 };
 static Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
 static Preferences store;

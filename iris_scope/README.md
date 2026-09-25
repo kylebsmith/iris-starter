@@ -1,6 +1,7 @@
 # iris_scope — see the mapping
 
-**Run this before anything that makes sound.**
+**Run this after `iris_tilt` and before anything that makes sound** (step 8
+of GET-STARTED.md).
 
 Sound is a bad first demo. When a mapping sounds wrong you cannot tell whether
 the network is wrong, your synth is wrong, or your ears are. A picture has no
@@ -10,11 +11,14 @@ input value, including the ones you never taught it.
 ## What you need
 
 A board and a BNO055 sensor on I²C — the two-wire bus (inter-integrated
-circuit) that the STEMMA QT cable carries. Nothing else — no knobs, no buttons, no screen.
+circuit) that carries data and clock on two pins; PARTS.md shows how to
+connect it. Nothing else — no knobs, no buttons, no screen.
 The sketch searches for the sensor across the pin pairs the common ESP32-S3
 boards use, so you do not have to know which pins yours is on.
 
-No sensor at all? Set `USE_ANALOG 1` at the top and turn a potentiometer on A0.
+No sensor at all? Set `USE_ANALOG 1` at the top and turn a potentiometer on
+`ANALOG_PIN`: GPIO 2 on the ES3C28P's expansion socket (wiring in PARTS.md;
+check it on the board), A0 on other boards.
 
 ## Run it
 
@@ -51,8 +55,9 @@ than a fader.
    never demonstrated. That is the invention.
 2. **Add a third pose in the middle**, pulling it somewhere unexpected. Watch
    the curve bend to reach it. You did not tell it how to bend.
-3. **Press `d`** to delete that pose. Watch the curve relax. This is the repair
-   loop: a bad take is deleted, not started over.
+3. **Press `d`** to delete that pose. Its dot leaves the picture at once and
+   the curve relaxes as the network retrains. This is the repair loop: a bad
+   take is deleted, not started over.
 4. **Put two different answers at the same pose.** The curve goes flat and the
    board tells you why. The network is not broken — you asked for two things at
    once and it gave you the average, which is the only honest answer.
@@ -81,9 +86,11 @@ Monitor is a valid second view:
 ```
 X lo hi unit         the sensor's full physical scale, and its unit
 R lo hi              the input range you have actually visited
+N n                  how many demonstrations the board holds; the n D lines
+                     that follow are all of them
 D index x y0 y1      a demonstration: input x taught to mean (y0, y1)
-C n x a b x a b ...  the curve: n points of (input, out0, out1)
-L x y0 y1            live: where you are right now
+C n x a b x a b ...  the curve: n points of (input, out0, out1); C 0 is no curve
+L x [y0 y1]          live: where you are now, and what it plays once there are two
 A y0 y1              the board echoing back the target you just clicked
 M text               a message for you
 ```
@@ -100,7 +107,10 @@ fits on a screen as a curve. You lose that the moment there are three inputs.
 Two outputs is the smallest number that makes SCOPE worth looking at — one
 output is a line, two is a shape.
 
-Change `N_IN` and `N_OUT` at the top when the picture stops surprising you.
+`N_IN` and `N_OUT` at the top are fixed at 1 and 2 for this sketch: the
+reading, the targets and the plot are all written for one input and two
+outputs, and changing only the numbers reads past the end of the arrays.
+To go further, start from `boilerplate/any_sensor`, which takes any shape.
 
 Adding outputs that **move together** is free — measured: eight coordinated
 outputs are slightly *more* accurate than one, because every demonstration

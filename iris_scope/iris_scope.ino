@@ -1,7 +1,7 @@
 /* iris_scope — SEE THE MAPPING
    ===========================
-   This is the first thing to run. Not because it makes sound, but because it
-   makes the network VISIBLE.
+   Run this after iris_tilt (GET-STARTED.md, step 8). Not because it makes
+   sound, but because it makes the network VISIBLE.
 
    You tilt the board and press SPACE, at two or more different poses. Each
    press says "when the board is like THIS, the numbers should be THAT." Then the network fills in
@@ -78,7 +78,8 @@
    that still has an inside — you can draw its whole behaviour as a curve on
    a screen, which you cannot do once there are three or four. Two outputs is
    the smallest number that makes the scope view interesting: one output is a
-   line, two is a shape. Change these when the picture stops surprising you. */
+   line, two is a shape. Keep them at 1 and 2: the reading, the targets and the
+   plot are written for exactly this shape. */
 #define N_IN    1
 #define N_OUT   2
 #define N_HID  12

@@ -199,10 +199,13 @@ void loop() {
                     ++recorded, in[0], in[1]);
       if (recorded == 3) {
         uint32_t t0 = millis();
-        int fitted = iris_train(k);
-        if (!fitted) Serial.println("TRAINING FAILED -- the instrument is not fitted.");
-        Serial.printf("\ntrained in %lu ms, %d epochs. Now move it.\n",
-                      (unsigned long)(millis() - t0), iris_train_epochs_done(k));
+        iris_train(k);
+        if (!iris_is_trained(k))
+          Serial.printf("\nTRAINING FAILED -- status %d. The instrument is not fitted: press c and record again.\n",
+                        (int)iris_get_status(k));
+        else
+          Serial.printf("\ntrained in %lu ms, %d epochs. Now move it.\n",
+                        (unsigned long)(millis() - t0), iris_train_epochs_done(k));
 
         /* The most likely first mistake is three poses that are nearly the
            same. Training reports perfect success either way -- it fitted what
