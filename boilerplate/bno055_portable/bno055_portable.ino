@@ -81,16 +81,14 @@ void setup() {
 }
 
 /* Training in slices, so the instrument never goes deaf. iris_train() blocks
-   for 2.7-3.0 seconds at eight or more demonstrations on an ESP32-S3, measured.
-   iris_train_begin + iris_train_slice do the identical fit in pieces --
-   verified bit-identical at 4, 12 and 20 demonstrations, including with a
-   prediction between every slice. The reseed keeps them identical: iris_train()
-   does it first and iris_train_begin does not.
+   for seconds at eight or more demonstrations on an ESP32-S3 (device_torture
+   test 5 measures it on your board). iris_train_begin + iris_train_slice do
+   the same fit in pieces and end bit-identical to iris_train, whatever the
+   slice size, with a prediction between slices or not.
    Same pattern as boilerplate/any_sensor. */
 static bool training = false;
 
 static void start_training(void) {
-  iris_reseed(k, iris_seed(k));
   if (!iris_train_begin(k, 0)) { Serial.println(F("TRAINING REFUSED.")); return; }
   training = true;
   Serial.println(F("learning -- keep moving, it stays alive."));

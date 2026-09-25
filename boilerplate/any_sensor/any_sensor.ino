@@ -240,24 +240,20 @@ void setup() {
 
 /* ---- TRAINING WITHOUT GOING DEAF ---------------------------------------
    iris_train() does the whole fit in one call and does not return until it is
-   finished. Measured on an ESP32-S3: 595 ms at 4 demonstrations and 2.7-3.0
-   SECONDS at 8 to 20. For those seconds the board reads no sensor, answers no
-   key and makes no sound -- which, in an instrument, is the entire experience.
+   finished: on an ESP32-S3 that is seconds at eight or more demonstrations
+   (device_torture test 5 measures it on your board). For those seconds the
+   board reads no sensor, answers no key and makes no sound -- which, in an
+   instrument, is the entire experience.
 
-   iris_train_begin / iris_train_slice do exactly the same fit in pieces, and
-   the result is BIT-IDENTICAL -- verified across 4, 12 and 20 demonstrations,
-   including with a prediction between every single slice, which is what this
-   sketch does. So the instrument keeps playing while it learns, and you can
-   hear it improve. There is no cost, only a loop.
-
-   The reseed matters: iris_train() reseeds before fitting so that the same
-   demonstrations always give the same instrument. iris_train_begin does not do
-   that for you, so doing it here is what keeps the two equivalent. */
+   iris_train_begin / iris_train_slice do exactly the same fit in pieces:
+   iris_train_begin starts from the instrument's seed as iris_train does, and
+   the result is BIT-IDENTICAL to iris_train whatever the slice size, with a
+   prediction between every slice, which is what this sketch does. So the
+   instrument keeps playing while it learns, and you can hear it improve. */
 static bool training = false;
 static uint32_t train_started = 0;
 
 static void start_training(void) {
-  iris_reseed(k, iris_seed(k));      /* what iris_train() does first */
   if (!iris_train_begin(k, 0)) {
     Serial.println(F("TRAINING REFUSED -- nothing to fit."));
     return;

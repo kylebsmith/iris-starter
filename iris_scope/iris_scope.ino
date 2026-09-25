@@ -214,10 +214,7 @@ static void check_spread(void) {
    form, that is the worst possible moment to stop drawing. iris_train_begin +
    iris_train_slice do the identical fit in pieces: verified bit-identical at
    4, 12 and 20 demonstrations, including with a prediction between every
-   slice, which is exactly what happens below.
-
-   The reseed is what keeps it identical -- iris_train() does it first and
-   iris_train_begin does not do it for you. */
+   slice, which is exactly what happens below. */
 static bool training = false;
 
 static void retrain_and_redraw(void) {
@@ -238,7 +235,6 @@ static void retrain_and_redraw(void) {
                    : "no demonstrations yet. Move the sensor and press SPACE.");
     return;
   }
-  iris_reseed(k, iris_seed(k));
   if (!iris_train_begin(k, 0)) { say("TRAINING REFUSED - nothing to fit"); return; }
   training = true;
   say("learning - the curve will settle as it goes");
