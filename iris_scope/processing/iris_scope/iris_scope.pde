@@ -151,6 +151,10 @@ void serialEvent(Serial p) {
   else if (f[0].equals("R") && f.length >= 3) {     // the part visited
     seenLo = float(f[1]); seenHi = float(f[2]); haveSeen = true;
   }
+  else if (f[0].equals("N") && f.length >= 2) {     // how many the board holds
+    nDemo = constrain(int(f[1]), 0, dx.length);
+    if (nDemo < 2) { nCurve = 0; haveOut = false; }
+  }
   else if (f[0].equals("D") && f.length >= 5) {
     int i = int(f[1]);
     if (i >= 0 && i < dx.length) {

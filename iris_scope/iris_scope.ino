@@ -3,8 +3,8 @@
    This is the first thing to run. Not because it makes sound, but because it
    makes the network VISIBLE.
 
-   You tilt the board and press a key three times. Each press says "when the
-   board is like THIS, the numbers should be THAT." Then the network fills in
+   You tilt the board and press SPACE, at two or more different poses. Each
+   press says "when the board is like THIS, the numbers should be THAT." Then the network fills in
    everything in between — and the whole point of this sketch is that you can
    SEE what it filled in, as a curve, instead of taking it on faith.
 
@@ -23,10 +23,16 @@
    You can also just read the serial output. It is plain text on purpose.
 
    WHAT IT SENDS (one thing per line, so you can read it yourself)
+     X lo hi unit         the sensor's full scale, sent once at power-on
      R lo hi              the input range it has seen so far
+     N n                  how many demonstrations the board holds now; the
+                          n D lines that follow are all of them
      D index x y0 y1      demonstration: input x taught to mean (y0, y1)
-     C n x0 a0 b0 x1 ...  the curve: n points of (input, out0, out1)
-     L x y0 y1            live: where you are right now
+     C n x0 a0 b0 x1 ...  the curve: n points of (input, out0, out1);
+                          C 0 means there is no curve (fewer than two)
+     L x [y0 y1]          live: where you are now, and what it plays once
+                          there are two demonstrations
+     A y0 y1              the board received the target you clicked
      M text               a message for the human
 
    HARDWARE: a board and a BNO055 on I2C. Nothing else -- no knobs, no
@@ -147,7 +153,10 @@ static void send_range(void) {
   Serial.print(' ');     Serial.println(hi, 4);
 }
 
+/* N first, so the plot knows exactly how many dots to draw: a deleted
+   demonstration disappears from the picture as soon as it leaves the board. */
 static void send_demos(void) {
+  Serial.print(F("N ")); Serial.println(demos);
   for (int i = 0; i < demos; ++i) {
     Serial.print(F("D ")); Serial.print(i);
     Serial.print(' ');     Serial.print(demo_x[i], 4);
@@ -364,8 +373,9 @@ void loop(void) {
       if (demos > 0 && iris_delete_last(k)) {
         demos--;
         say("deleted the last demonstration");
+        send_demos();                                /* the dot goes now */
         if (demos >= 2) retrain_and_redraw();
-        else { send_range(); send_demos(); say("need two to draw a curve"); }
+        else { send_range(); Serial.println(F("C 0")); say("need two to draw a curve"); }
       } else say("nothing to delete");
     }
     else if (c == 'c') {
