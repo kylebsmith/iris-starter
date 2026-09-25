@@ -7,14 +7,17 @@
    display board). It drives that board's TFT (thin-film transistor) screen,
    an ILI9341 at 240 x 320, over SPI (serial peripheral interface, the fast
    four-wire bus screens use) on its fixed pins, and talks to its FT6336
-   touch controller on I2C at 0x38, so it will not build for an Uno, a Pico
-   or a plain ESP32 -- that is the hardware, not a bug. */
+   touch controller on I2C (inter-integrated circuit, a two-wire bus) at
+   0x38, so it will not build for an Uno, a Pico or a plain ESP32 -- that is
+   the hardware, not a bug. */
 #include <Wire.h>
 
 /* BOARD SETTINGS. This sketch drives the ES3C28P's own pins, so it needs
    the ESP32-S3 board entry, and Serial reaches the computer through the
-   chip's own USB port only with USB CDC On Boot enabled. Either USB Mode
-   works: this sketch uses no feature of the TinyUSB mode. */
+   chip's own USB (Universal Serial Bus) port only with USB CDC On Boot
+   enabled (CDC: Communications Device Class, the USB serial-port standard).
+   Either USB Mode works: this sketch uses nothing from the USB-OTG mode's
+   TinyUSB software. */
 #if defined(ARDUINO_ARCH_ESP32) && !defined(CONFIG_IDF_TARGET_ESP32S3)
 #error "This sketch is for the ESP32-S3 display board. Set Tools -> Board -> esp32 -> ESP32S3 Dev Module, then set the board options in GET-STARTED.md."
 #endif
@@ -80,7 +83,15 @@ void setup() {
   Wire.begin(SDA_PIN, SCL_PIN);
   Serial.println("screen drawn. If you see IRIS, a white border and three");
   Serial.println("colour squares (red, green, blue) the panel is good.");
-  Serial.println("Now touch it - coordinates print here.\n");
+  /* Say so if the touch controller does not answer, rather than printing
+     nothing for every touch. */
+  Wire.beginTransmission(TOUCH_ADDR);
+  if (Wire.endTransmission() != 0) {
+    Serial.println("The touch controller (FT6336, I2C 0x38) is not answering.");
+    Serial.println("An ES3N28P has no touch; on an ES3C28P, run i2c_find.");
+  } else {
+    Serial.println("Now touch it - coordinates print here.\n");
+  }
 }
 
 void loop() {
