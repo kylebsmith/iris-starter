@@ -119,9 +119,8 @@ less consistent than anything it was tuned against.
 **Doesn't prove:** that the mapping is any good musically. That isn't a
 software question. You answer it by playing.
 
-What five of the sketches did on an ES3C28P, and which checks, for those and
-for `boilerplate/stemma_bno055`, still wait for a person:
-[board-logs/2026-09-25-es3c28p.md](board-logs/2026-09-25-es3c28p.md).
+What the sketches did on an ES3C28P, including the release header's hashes on
+the board: [board-logs/2026-09-25-es3c28p.md](board-logs/2026-09-25-es3c28p.md).
 
 ## Two libraries, two different risks
 
