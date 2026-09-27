@@ -56,6 +56,7 @@
 #include <Wire.h>
 #include <Adafruit_BNO055.h>
 #include <Preferences.h>        /* the ESP32's own key-value store in flash */
+#include "heading.h"            /* UP and FRONT: orientation that never wraps */
 #include "iris.h"
 #if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 3
 #error "This sketch is written for iris 0.3. Copy iris.h from iris 0.3 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
@@ -73,7 +74,17 @@
 #endif
 
 /* ---- 1. THE SHAPE ------------------------------------------------------- */
+/* USE_HEADING 1 reads the board's whole orientation, a turn about the
+   vertical included, as six numbers that never wrap (heading.h, beside this
+   file); send f over the serial port to make the way the board points now
+   its front. 0 reads two axes of tilt from gravity. The two shapes differ,
+   so an instrument kept in flash under one does not load under the other. */
+#define USE_HEADING 0
+#if USE_HEADING
+#define N_INPUTS   6        /* UP and FRONT, three numbers each */
+#else
 #define N_INPUTS   2        /* two axes of tilt. Use 3 to add the third. */
+#endif
 #define N_OUTPUTS  3
 #define N_DEMOS   16
 
@@ -97,16 +108,22 @@
 static const int POT_PIN[] = { 2, 3, 14 };
 static Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28, &Wire);
 static Preferences store;
+static Heading heading;
 
 /* ---- 2. READ THE SENSOR -------------------------------------------------
-   Gravity, not orientation in degrees. Euler angles wrap from +180 to -180,
+   Gravity, not orientation in degrees (or, with USE_HEADING, UP and FRONT
+   from heading.h, which never wrap either). Euler angles wrap from +180 to -180,
    so two poses a degree apart arrive at opposite ends of the range and the
    sound falls off a cliff there. Gravity points down and never wraps.
    No scaling: raw metres per second squared is exactly what iris wants. */
 static void read_sensor(float *in) {
+#if USE_HEADING
+  heading_read(heading, bno, in);
+#else
   imu::Vector<3> g = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
   in[0] = (float)g.x();
   in[1] = (float)g.y();
+#endif
 }
 
 /* ---- 3. WHERE THE TARGET COMES FROM ------------------------------------- */
@@ -295,7 +312,15 @@ void loop() {
     delay(50);                                          /* debounce the release */
   }
 
-  if (Serial.available() && Serial.read() == 'x') print_instrument();
+  if (Serial.available()) {
+    const int c = Serial.read();
+    if (c == 'x') print_instrument();
+#if USE_HEADING
+    if (c == 'f') Serial.println(heading_set_front(heading, bno)
+                                 ? F("front set: the way the board points now.")
+                                 : F("the board points too near straight up or down to set a front."));
+#endif
+  }
 
   keep_training();   /* a slice per pass, free when idle */
 

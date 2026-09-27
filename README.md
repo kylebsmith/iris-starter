@@ -92,6 +92,15 @@ BNO055 library. Gravity, not orientation in degrees — Euler angles wrap from
 +180 to −180, and two poses a degree apart then arrive as opposite ends of the
 range. Nothing smooth can fit that. Gravity points down and never wraps.
 
+Gravity cannot see a turn about the vertical, though, and heading as an angle
+wraps at 360 degrees and has no value at all when the board points straight
+up. For an instrument that should hear which way the player faces,
+`boilerplate/stemma_bno055/heading.h` gives two directions in the board's own
+frame: UP, from gravity, and a FRONT the player sets by pointing the board and
+sending `f`, from the sensor's fusion quaternion. That is six numbers that
+move smoothly however the board turns and never wrap; set `USE_HEADING 1` in
+that sketch to play from them.
+
 **It does not scale anything.** iris fits its input range to the demonstrations
 you actually give it, so raw sensor units work exactly as well as anything you
 divide them by — and a sensor mounted slightly off level needs no correction at
