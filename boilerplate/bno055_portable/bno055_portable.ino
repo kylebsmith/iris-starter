@@ -10,6 +10,12 @@
    builds on an ESP32 and nowhere else. This one uses neither. It compiles
    for a Raspberry Pi Pico (both Arduino cores for it) and the ESP32-S3, and
    refuses an Uno below with an explanation instead of a compiler error.
+
+   Not on the kit's ES3C28P: use stemma_bno055 there. This sketch starts the
+   sensor's bus with Wire.begin(), the board's default pins, which on an
+   ESP32-S3 are GPIO 8 and 9. The ES3C28P wires those to its audio codec's
+   data line and its battery monitor (PARTS.md), and its sensor socket is
+   on GPIO 16 and 15.
    ========================================================================= */
 #include <Wire.h>
 #include <Adafruit_BNO055.h>
