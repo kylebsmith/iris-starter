@@ -26,8 +26,8 @@
    RUNTIME: about a minute. Open Serial Monitor at 115200 and wait for DONE.
    ========================================================================= */
 #include "iris.h"
-#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
-#error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 3
+#error "This sketch is written for iris 0.3. Copy iris.h from iris 0.3 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
 /* No fused multiply-add in this file. Test 1's demonstrations are computed
@@ -60,7 +60,7 @@
 static Preferences store;
 #endif
 
-/* The value this exact recipe produces on a laptop with iris 0.2.0, pinned in
+/* The value this exact recipe produces on a laptop with iris 0.3.0, pinned in
    the library's tests/starter_recipes.c. If the chip disagrees, that is a
    real result about the chip or its compiler, not a broken test. Keep the
    output and tell someone. */

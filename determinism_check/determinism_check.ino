@@ -19,8 +19,8 @@
    BOARD SETTINGS: as in GET-STARTED.md. No sensor needed -- the data is fixed.
    ========================================================================= */
 #include "iris.h"
-#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
-#error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 3
+#error "This sketch is written for iris 0.3. Copy iris.h from iris 0.3 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
 /* No fused multiply-add in this file. The demonstrations below are computed
@@ -37,7 +37,7 @@
 #pragma STDC FP_CONTRACT OFF
 #endif
 
-/* The laptop's values for this recipe with iris 0.2.0. PREDICTION_HASH is
+/* The laptop's values for this recipe with iris 0.3.0. PREDICTION_HASH is
    pinned in the library's tests/starter_recipes.c. FILE_HASH is the same
    recipe's saved file (format 7, 872 bytes), computed by a laptop build of
    this sketch. */

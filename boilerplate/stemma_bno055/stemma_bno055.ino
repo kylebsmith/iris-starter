@@ -50,8 +50,8 @@
 #include <Adafruit_BNO055.h>
 #include <Preferences.h>        /* the ESP32's own key-value store in flash */
 #include "iris.h"
-#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
-#error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 3
+#error "This sketch is written for iris 0.3. Copy iris.h from iris 0.3 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
 /* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB (Universal Serial Bus)

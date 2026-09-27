@@ -2,7 +2,7 @@
 
 Tilt the board. It learns what you meant. Then it plays.
 
-Arduino sketches, the iris library (version 0.2.0, from
+Arduino sketches, the iris library (version 0.3.0, from
 https://github.com/kylebsmith/iris) copied into each sketch that uses it, and
 a walkthrough. It exists so you can get a trained model running on real
 hardware in about twenty minutes, most of it downloading, and see the thing
@@ -134,7 +134,7 @@ instrument — same demonstrations, different result. That is why it has no
 dependencies, why its behaviour is pinned by hashes in its own test suite, and
 why it's a single file sitting next to your sketch rather than something you
 install. Each sketch that uses it checks at compile time that its copy is
-iris 0.2 and names the file to copy when it is not.
+iris 0.3 and names the file to copy when it is not.
 
 You should own your instrument. A stranger's commit shouldn't be able to
 restring it.

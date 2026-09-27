@@ -44,8 +44,8 @@
    nothing you will notice. Raise the three ceilings above with it if you go
    past 4 in, 4 out or 12 hidden; iris_init refuses rather than truncating. */
 #include "iris.h"
-#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 2
-#error "This sketch is written for iris 0.2. Copy iris.h from iris 0.2 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
+#if IRIS_VERSION_MAJOR != 0 || IRIS_VERSION_MINOR != 3
+#error "This sketch is written for iris 0.3. Copy iris.h from iris 0.3 (https://github.com/kylebsmith/iris) into this sketch's folder, next to the .ino file, replacing the copy there."
 #endif
 
 /* SERIAL MONITOR SETTING. On an ESP32-S3 whose USB (Universal Serial Bus)

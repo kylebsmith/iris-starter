@@ -21,7 +21,7 @@ env:
   FQBN_HWCDC: "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashSize=16M,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB"
   # The library release the copies of iris.h must equal.
   IRIS_REPO: https://github.com/kylebsmith/iris
-  IRIS_REF: v0.2.0
+  IRIS_REF: v0.3.0
 
 jobs:
   compile:

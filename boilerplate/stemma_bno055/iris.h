@@ -264,6 +264,10 @@
                                           demonstrations
      int   iris_classify_1nn(k, in, out)  the nearest demonstration's outputs
                                           exactly; its identifier, or -1
+     int   iris_nearest(k, in, ids, dists, n)
+                                          the n nearest demonstrations'
+                                          identifiers and distances, nearest
+                                          first; how many it wrote
      float iris_novelty(k, in)            0 on a demonstration, rising to 1
                                           away from them; -1 if refused
 
@@ -286,6 +290,8 @@
      size_t iris_save_size(k)             exactly the bytes iris_save writes
      size_t iris_save(k, buf, cap)        bytes written, or 0
      int    iris_load(k, buf, bytes)      1, or 0 with k untouched
+     int    iris_copy(dst, src)           iris_save then iris_load, with no
+                                          buffer; 1, or 0 with dst untouched
 
    Types: iris (the instrument), iris_status (what iris_get_status returns),
    iris_progress_fn (the callback iris_continue_to_plateau calls).
@@ -293,7 +299,8 @@
    Macros: IRIS_ARENA(n_in, n_hid, n_out, cap), the arena size at compile
    time; IRIS_ELM_SCRATCH(n_hid, n_out), the closed-form trainer's scratch;
    IRIS_ARENA_ELM, the two added together; IRIS_MAX_IN, IRIS_MAX_OUT and
-   IRIS_MAX_HID, which you may lower before the #include, and IRIS_MAX_EX;
+   IRIS_MAX_HID, which you may lower or raise before the #include, and
+   IRIS_MAX_EX;
    IRIS_VERSION_MAJOR, _MINOR, _PATCH and _STRING; IRIS_STRESS_MIN_EX and
    IRIS_STRESS_FLAG (PART 8f); IRIS_KNN_MAXK (PART 10); IRIS_ID_LIMIT, the
    bound on identifiers on this machine (PART 4); IRIS_W_LIMIT, the
@@ -465,9 +472,9 @@
    (PART 9). It changes only when the bytes of a file or their meaning
    change, never merely because the library's version does. */
 #define IRIS_VERSION_MAJOR 0
-#define IRIS_VERSION_MINOR 2
+#define IRIS_VERSION_MINOR 3
 #define IRIS_VERSION_PATCH 0
-#define IRIS_VERSION_STRING "0.2.0"
+#define IRIS_VERSION_STRING "0.3.0"
 
 /* The maxima size every working array, so on a small board they are the
    stack budget.
@@ -494,8 +501,33 @@
    iris_predict from 158 to 46. These are single frames as the compiler
    reports them, not a measured run-time stack depth. The maxima must be at
    least the n_in, n_out and n_hid you pass to iris_init, which iris_init
-   checks. On a 32-bit board (ESP32, RP2040, STM32) leave them alone; the
-   defaults cost nothing you have. */
+   checks. On a 32-bit board (ESP32, RP2040, STM32) there is no need to
+   shrink them; the defaults cost nothing you have.
+
+   They may be raised the same way, for a synthesiser with more than sixteen
+   parameters, say. Nothing in this file depends on the default values:
+   tests/tu/raised.c records, trains by both trainers, saves, loads, copies
+   and plays an instrument of 31 outputs with IRIS_MAX_IN 64, IRIS_MAX_HID 96
+   and IRIS_MAX_OUT 32. The cost is stack, because every working array grows
+   with its maximum. The frames in bytes, from xtensa-esp32s3-elf-gcc 14.2.0
+   -Os -fstack-usage with every function compiled on its own as above (gcc-15
+   -Os on the 64-bit ARM laptop gives each within 48 bytes of these):
+
+                                  defaults   IRIS_MAX_OUT 32   64, 128, 32
+       iris_internal_train_elm_ex    624           688            1,072
+       iris_internal_loo             384           496              640
+       iris_internal_train_run       288           352              480
+       iris_knn_predict              304           304              432
+       iris_predict                  176           176              304
+
+   The last column raises all three: IRIS_MAX_IN 64, IRIS_MAX_HID 128 and
+   IRIS_MAX_OUT 32. The ESP32 Arduino core gives the loop task 8,192 bytes
+   of stack (CONFIG_ARDUINO_LOOP_STACK_SIZE in its sdkconfig for the
+   ESP32-S3, core 3.3.3). What bounds the maxima is arithmetic: IRIS_ARENA
+   at the maxima with IRIS_MAX_EX takes must stay below 2^32 bytes, which
+   unsigned long is guaranteed to hold (see IRIS_ARENA). At the default
+   IRIS_MAX_HID that allows IRIS_MAX_IN and IRIS_MAX_OUT together up to about
+   250,000, far past the memory of any board. */
 #ifndef IRIS_MAX_IN
 #define IRIS_MAX_IN   32   /* sensor features in  */
 #endif
@@ -899,7 +931,8 @@ IRIS_API float iris_internal_sigmoid(float x) {
    microseconds a closed-form fit of 20 demonstrations with 12 hidden units
    takes. It adds nothing to the neighbour searches (iris_knn_predict,
    iris_classify_1nn, iris_delete_nearest), which compare squared distances
-   and never take a root. */
+   and never take a root; iris_nearest takes one for each distance it
+   reports. */
 IRIS_API float iris_internal_sqrt(float x) {
   union { float f; uint32_t u; } v;
   v.f = x;
@@ -1083,8 +1116,8 @@ struct iris {
    the main loop, even if both only play it. iris_predict, iris_knn_predict
    and iris_classify_1nn write inside the instrument (the network's working
    values, the status, and on an instrument never fitted the neighbour
-   ranges), and iris_novelty fits those ranges too, which is why all four
-   take a non-const iris *. An interrupt landing mid-call leaves both
+   ranges), and iris_novelty and iris_nearest fit those ranges too, which
+   is why all five take a non-const iris *. An interrupt landing mid-call leaves both
    answers wrong: give the interrupt its own instrument. Functions that take
    a const iris * write nothing, but reading an instrument while another
    thread writes it is still a race.
@@ -1152,11 +1185,13 @@ struct iris {
    Rule 1, for a call that either works or does not: 0 means the call did
    nothing, non-zero means it worked. That covers iris_init (a null
    pointer), iris_size, iris_shape, iris_record, iris_get, iris_train,
-   iris_train_begin, the delete functions, iris_save and iris_load.
+   iris_train_begin, the delete functions, iris_save, iris_load and
+   iris_copy.
    iris_record returns the new demonstration's identifier, never 0 because
    identifiers start at 1, so it obeys the rule and hands you the number you
    need later to delete that take; iris_get returns the identifier of the
-   row it copied.
+   row it copied; iris_nearest returns how many demonstrations it wrote out,
+   so its 0 too means it wrote nothing.
 
    Rule 2, for a call that returns a measurement you asked for: the
    measurement on success, -1 on refusal. That covers iris_continue,
@@ -1179,7 +1214,8 @@ struct iris {
        IRIS_NAN_TRAPPED.
      - With no demonstrations stored, iris_predict writes 0 and reports
        IRIS_NOT_FITTED, while iris_knn_predict and iris_classify_1nn write 0
-       (iris_classify_1nn also returns -1) and leave the status alone.
+       (iris_classify_1nn also returns -1), iris_nearest writes nothing and
+       returns 0, and all three leave the status alone.
 
    The readers cannot fail and so answer every question: iris_count,
    iris_capacity, iris_seed, iris_save_size, iris_is_trained,
@@ -1922,6 +1958,20 @@ IRIS_API float iris_internal_denorm_out(const iris *k, int i, float y) {
      out_o = iris_internal_denorm_out(k, o, output_o)     scale the sound out
      out_o = iris_internal_clampf(out_o, out_lo[o], out_hi[o])
                                                           and hold it in range
+
+   Between and beyond the takes. The fit passes through each take, to within
+   its training error, but it is not flat there: the slope it has between
+   the takes carries on through them, so a reading a little off a take plays
+   a little off its sound, and how wide a place is to land on depends on
+   where the takes sit. The clamp adds plateaus. Wherever the fitted curve
+   would pass the end of an output's demonstrated range the output holds
+   that end exactly, which beyond the outermost takes, and sometimes just
+   inside them, is a stretch where moving changes nothing.
+   examples/04_categories.c prints one input swept across four takes: the
+   brightness passes 0.3502 at the take at 30 degrees (taught 0.35), with
+   0.2988 and 0.4058 five degrees either side, and holds at exactly 0.2000
+   from 0 to 10 degrees, the first take included, and at exactly 0.9000 from
+   85 degrees on, past the last take at 80 (0.8997).
 
    For 2 inputs, 12 hidden and 3 outputs that is 60 multiply-adds and 20
    float divisions (one in each input's scaling, one in each of the 15
@@ -4172,6 +4222,27 @@ IRIS_API size_t iris_save(const iris *k, void *buf, size_t cap) {
   return need;
 }
 
+/* At rest: nothing carried over from whatever the arena held before. What
+   iris_load and iris_copy do once the instrument's own values are in place
+   (see "After a load" above).
+
+   The training error is not in the file, but the fit and the demonstrations
+   are, so it is measured exactly as every trainer measures it when it
+   finishes (iris_internal_recall_error). A loaded instrument whose fit
+   matches its demonstrations reports the bits the saved one did; a stale
+   one reports the error over the demonstrations it holds now. */
+IRIS_API void iris_internal_at_rest(iris *k) {
+  iris_internal_default_learning(k);
+  iris_internal_zero_velocity(k);
+  for (int i = 0; i < k->cap; ++i) k->ex_res[i] = 0.0f;
+  k->res_epochs = 0;
+  k->tr_done = 0; k->tr_ceiling = 0; k->tr_running = 0; k->tr_n_ex = 0;
+  k->tr_ref = 0.0f; k->tr_err = 0.0f;
+  k->status = IRIS_STATUS_OK;
+  { float x[IRIS_MAX_IN];
+    k->last_error = iris_internal_recall_error(k, x); }
+}
+
 /* Reads a file written by iris_save into k, an instrument of the same shape.
    Returns 1, or 0 with k untouched. */
 IRIS_API int iris_load(iris *k, const void *buf, size_t bytes) {
@@ -4202,24 +4273,104 @@ IRIS_API int iris_load(iris *k, const void *buf, size_t bytes) {
     k->fitted  = (flags & 1u) ? 1 : 0;
     k->trained = (flags & 2u) ? 1 : 0;
   }
+  iris_internal_at_rest(k);
+  return 1;
+}
 
-  /* At rest: nothing carried over from whatever this arena held before. */
-  iris_internal_default_learning(k);
-  iris_internal_zero_velocity(k);
-  for (int i = 0; i < k->cap; ++i) k->ex_res[i] = 0.0f;
-  k->res_epochs = 0;
-  k->tr_done = 0; k->tr_ceiling = 0; k->tr_running = 0; k->tr_n_ex = 0;
-  k->tr_ref = 0.0f; k->tr_err = 0.0f;
-  k->status = IRIS_STATUS_OK;
+/* Would iris_save(src) followed by iris_load(dst) succeed? Every rule of the
+   table above, asked of src itself instead of the bytes iris_save would
+   write for it: each test is one of iris_internal_file_ok's, in its order,
+   applied to the value that would sit at that place in the file. iris_save
+   puts the rules to src and iris_load puts them to dst, and the two differ
+   only in whose shape and capacity the file is compared with, so both are
+   here. Four of that function's tests always pass for a file iris_save has
+   just written and are not repeated: the magic, the format number, the
+   header size, and the length and checksum of the bytes. tests/load.c
+   breaks each rule in an instrument and holds iris_copy's answer to that
+   of iris_save and iris_load. */
+IRIS_API int iris_internal_copy_ok(const iris *dst, const iris *src) {
+  const size_t ni = (size_t)src->n_in, nh = (size_t)src->n_hid, no = (size_t)src->n_out;
+  const uint32_t flags = (src->fitted ? 1u : 0u) | (src->trained ? 2u : 0u);
+  const uint32_t n_ex = (uint32_t)src->n_ex, next_id = (uint32_t)src->next_id;
+  uint32_t top = 0u;
+  size_t i, j;
+  if (flags == 2u) return 0;                   /* trained, but never fitted */
+  if (dst->n_in != src->n_in || dst->n_hid != src->n_hid || dst->n_out != src->n_out) return 0;
+  if (n_ex > (uint32_t)src->cap || n_ex > (uint32_t)dst->cap) return 0;
+  if (src->seed == 0u) return 0;
+  if (next_id < 1u || next_id > (uint32_t)IRIS_ID_LIMIT) return 0;
+  if (src->rng.s == 0u) return 0;
+  { const float s = iris_get_smoothing(src);
+    if (iris_internal_isbad(s) || s < 0.0f || s > 1.0f) return 0; }
+  for (i = 0; i < nh * ni; ++i) if (iris_internal_isbad(src->w1[i])) return 0;
+  for (i = 0; i < nh; ++i)      if (iris_internal_isbad(src->b1[i])) return 0;
+  for (i = 0; i < no * nh; ++i) if (iris_internal_isbad(src->w2[i])) return 0;
+  for (i = 0; i < no; ++i)      if (iris_internal_isbad(src->b2[i])) return 0;
+  for (i = 0; i < ni; ++i)
+    if (!iris_internal_range_ok(src->in_lo[i], src->in_hi[i], 1)) return 0;
+  for (i = 0; i < no; ++i)
+    if (!iris_internal_range_ok(src->out_lo[i], src->out_hi[i], 0)) return 0;
+  for (i = 0; i < (size_t)n_ex * (ni + no); ++i) if (iris_internal_isbad(src->ex[i])) return 0;
+  for (i = 0; i < (size_t)n_ex; ++i) {
+    const uint32_t id = (uint32_t)src->ex_id[i];
+    if (id < 1u || id >= next_id) return 0;
+    if (id <= top)
+      for (j = 0; j < i; ++j) if ((uint32_t)src->ex_id[j] == id) return 0;
+    if (id > top) top = id;
+  }
+  return 1;
+}
 
-  /* The training error is not in the file, but the fit and the
-     demonstrations are, so it is measured exactly as every trainer measures
-     it when it finishes (iris_internal_recall_error). A loaded instrument
-     whose fit matches its demonstrations reports the bits the saved one
-     did; a stale one reports the error over the demonstrations it holds now
-     (see "After a load" above). */
-  { float x[IRIS_MAX_IN];
-    k->last_error = iris_internal_recall_error(k, x); }
+/* One instrument into another of the same shape, exactly as iris_save
+   followed by iris_load would carry it across, with no buffer in between.
+   The same refusals, with dst untouched, and the same result: dst holds
+   src's weights, ranges, demonstrations, identifiers, seed, random state and
+   smoothing, and is at rest (see "After a load" above). Returns 1, or 0 with
+   dst untouched. src is only read.
+
+   What it is for. iris_train and iris_train_begin start over from the seed,
+   and a sliced run moves the weights between slices, so an instrument being
+   retrained plays a half-trained network until the run ends. To keep
+   playing the old fit, play one instrument and train another of the same
+   shape: record each new take into both (or copy the player into the
+   learner, then record into the learner), train the learner in slices
+   between predictions of the player, and when the run has finished, copy the
+   learner into the player. examples/05_keep_playing.c does this. The copy
+   costs what a load costs: one pass over the weights and demonstrations,
+   and the forward pass per demonstration that measures iris_last_error.
+
+   dst and src may be the same instrument. iris_copy(k, k) is iris_save and
+   iris_load of k into itself: it puts k at rest, ending a sliced run and
+   clearing the velocities, the ledger and the status, and leaves what k
+   plays as it was. */
+IRIS_API int iris_copy(iris *dst, const iris *src) {
+  if (!dst || !src) return 0;
+  if (!iris_internal_shape_fits(dst)) return 0;
+  if (!iris_internal_copy_ok(dst, src)) return 0;
+
+  /* Every rule has passed; in iris_load's order from here on. Read before
+     written, so that dst == src copies each value onto itself. */
+  { const size_t ni = (size_t)src->n_in, nh = (size_t)src->n_hid, no = (size_t)src->n_out;
+    const size_t nex = (size_t)src->n_ex;
+    const float smoothing = iris_get_smoothing(src);
+    size_t i;
+    dst->n_ex    = src->n_ex;
+    dst->seed    = src->seed;
+    dst->next_id = src->next_id;
+    dst->rng.s   = src->rng.s;
+    iris_set_smoothing(dst, smoothing);
+    for (i = 0; i < nh * ni; ++i) dst->w1[i] = src->w1[i];
+    for (i = 0; i < nh; ++i)      dst->b1[i] = src->b1[i];
+    for (i = 0; i < no * nh; ++i) dst->w2[i] = src->w2[i];
+    for (i = 0; i < no; ++i)      dst->b2[i] = src->b2[i];
+    for (i = 0; i < ni; ++i) { dst->in_lo[i]  = src->in_lo[i];  dst->in_hi[i]  = src->in_hi[i]; }
+    for (i = 0; i < no; ++i) { dst->out_lo[i] = src->out_lo[i]; dst->out_hi[i] = src->out_hi[i]; }
+    for (i = 0; i < nex * (ni + no); ++i) dst->ex[i] = src->ex[i];
+    for (i = 0; i < nex; ++i) dst->ex_id[i] = src->ex_id[i];
+    dst->fitted  = src->fitted  ? 1 : 0;
+    dst->trained = src->trained ? 1 : 0;
+  }
+  iris_internal_at_rest(dst);
   return 1;
 }
 
@@ -4288,6 +4439,9 @@ IRIS_API int iris_load(iris *k, const void *buf, size_t bytes) {
    been run against this code: the tests/audit.c check "1-NN: agrees with
    the Weka-IBk reference" compares it with a double-precision reference
    written to the same rules.
+
+   iris_nearest, the last function in this part, hands out what the other
+   two keep to themselves: which takes are nearest, and how near.
 
    Every saved instrument can play this way with nothing added to its file:
    the demonstrations and ranges are already in it, and which algorithm
@@ -4630,6 +4784,137 @@ IRIS_API int iris_classify_1nn(iris *k, const float *in, float *out) { if (!k) r
 #endif
   }
   return (int)k->ex_id[best];
+}
+
+/* The nearest demonstrations themselves, and how near each one is: the n
+   takes nearest to the reading, nearest first, the earliest-recorded first
+   on a tie. ids receives their identifiers and dists their distances, and
+   either may be null. Returns how many it wrote into each: n, unless fewer
+   takes are stored or fewer have a distance the float arithmetic can give
+   (below), and 0 when it refuses.
+
+   It ranks exactly as the neighbour functions above do, with the same
+   distance, the same scan and the same tie rule, so ids[0] is the
+   identifier iris_classify_1nn returns and, for any kk up to IRIS_KNN_MAXK,
+   the first kk are the takes iris_knn_predict blends. For n above that the
+   ranking carries on in the same order. What those functions keep to
+   themselves it hands out: how near the reading is. Holding a snapped
+   category until another take is clearly nearer (hysteresis), telling a
+   player how near a take they are, and refusing a gesture nobody taught all
+   need that number; examples/04_categories.c does the first.
+
+   The unit. A distance is the straight-line distance from the reading to
+   the take with every input counted in fractions of its range, the square
+   root of what the neighbour functions compare. 0.1 is a reading a tenth of
+   one input's range from the take and exactly on it in every other input;
+   a reading off by a tenth in each of n_in inputs is 0.1 * sqrt(n_in) away.
+   An input that never moved counts not at all. The number depends on the
+   reading, the take and the ranges alone, not on how many takes are stored,
+   and it is not clamped (novelty is, PART 7), so a threshold means the same
+   on every instrument whose inputs have the same ranges.
+
+   The ranges are the instrument's own, as for every neighbour function: the
+   ones it was last fitted to, or on an instrument never fitted the current
+   demonstrations', fitted here. A fitted instrument keeps its ranges when
+   you record or delete, so after new takes the distances are measured in
+   the ranges of the last fit until you train again.
+
+   Where the arithmetic runs out. The distance is computed in single
+   precision exactly as the neighbour functions compute it, and has their
+   limits. An input whose range is wider than the largest float, which only
+   takes beyond about 1.7e38 make, counts as never having moved. A take
+   whose squared distance comes out at the largest float or above, one about
+   1.8e19 ranges (the square root of the largest float) or more from the
+   reading, as a take recorded far outside the ranges of the last fit can
+   be, or not a number, a difference from the reading beyond the largest
+   float on an input that counts not at all, is left out while any other
+   take's squared distance is a number below it, as iris_knn_predict leaves
+   it out, so fewer than n can come back. When no take's is, the takes are
+   ranked by the far distance (see iris_internal_distance2_far), as the
+   other neighbour functions rank them. The far distance skips every input
+   that counts not at all and caps each other input at 10^15 ranges, so
+   below 10^15 ranges, where the cap cannot have acted, it is the distance
+   in the unit above and is reported as it is; a take 10^15 ranges or more
+   away is reported at infinity, past any threshold a caller sets.
+
+   It refuses as iris_classify_1nn does, returning 0 and writing nothing into
+   ids or dists: a null instrument, an empty store, a shape too big for this
+   translation unit (IRIS_NOT_FITTED), a reading that is not finite
+   (IRIS_NAN_TRAPPED), and a store in which no take's distance, ordinary or
+   far, is a number (IRIS_NAN_TRAPPED): a not-a-number written into the
+   arena, or a range narrower than the reciprocal of the largest float with
+   a reading exactly on its takes, a range iris_internal_fit_ranges never
+   makes. n below 1 asks for nothing and returns 0 before any of those.
+   Inside the instrument it writes what iris_classify_1nn writes when its
+   `out` is null: the status in those cases, and the ranges of an instrument
+   never fitted. Built with IRIS_NO_GUARDS, which is for measuring the
+   guards, it reports nothing for a reading that is not finite, where
+   iris_classify_1nn names the first take.
+
+   The cost is iris_knn_predict's scan, once for the first IRIS_KNN_MAXK
+   takes and once more for each further IRIS_KNN_MAXK. The stack holds one
+   scan's slots whatever n is: asking for every take of a large store is
+   slow, never deep. */
+/* Lengths: unchecked, as everywhere (see the interface block). Reads
+   exactly n_in floats from `in`, once, before it writes anything, so ids or
+   dists may share memory with it; writes at most n entries into each of ids
+   and dists. */
+IRIS_API int iris_nearest(iris *k, const float *in, int *ids, float *dists, int n) {
+  if (!k || n < 1) return 0;
+  if (!iris_internal_shape_fits(k)) { k->status = IRIS_NOT_FITTED; return 0; }
+  if (k->n_ex == 0) return 0;
+#ifndef IRIS_NO_GUARDS
+  for (int i = 0; i < k->n_in; ++i)
+    if (iris_internal_isbad(in[i])) { k->status = IRIS_NAN_TRAPPED; return 0; }
+#endif
+  if (!k->fitted) iris_internal_fit_ranges(k);
+  float inv[IRIS_MAX_IN], q[IRIS_MAX_IN];
+  iris_internal_neighbour_scale(k, inv);
+  for (int i = 0; i < k->n_in; ++i) q[i] = in[i];   /* every pass reads this copy */
+  union { float f; uint32_t u; } inf;
+  inf.u = 0x7F800000u;                       /* positive infinity, from its bits */
+  if (n > k->n_ex) n = k->n_ex;
+
+  /* Each pass is iris_knn_predict's scan for the next kk takes in the
+     ranking, which orders them by distance and then by position in the store:
+     a take already written ranks at or before the last one written, (last_d,
+     last_r), and is passed over. The first pass passes over nothing, so for n
+     up to IRIS_KNN_MAXK it is iris_knn_predict's scan exactly. A first pass
+     that finds nothing switches every pass to the far distance, as the other
+     functions rescan; a far distance the cap cannot have touched is reported
+     as it is (see "Where the arithmetic runs out"). */
+  const int stride = k->n_in + k->n_out;
+  int got = 0, far = 0, last_r = -1;
+  float last_d = -1.0f;
+  while (got < n) {
+    int   bi[IRIS_KNN_MAXK];
+    float bd[IRIS_KNN_MAXK];
+    const int kk = n - got < IRIS_KNN_MAXK ? n - got : IRIS_KNN_MAXK;
+    for (int j = 0; j < IRIS_KNN_MAXK; ++j) { bi[j] = -1; bd[j] = IRIS_FLT_MAX; }
+    for (int r = 0; r < k->n_ex; ++r) {
+      const float *row = k->ex + (size_t)r * stride;
+      const float d = far ? iris_internal_distance2_far(k, inv, row, q)
+                          : iris_internal_distance2(k, inv, row, q);
+      if (d > last_d || (d == last_d && r > last_r))
+        iris_internal_knn_insert(bd, bi, kk, r, d);
+    }
+    if (bi[0] < 0 && got == 0 && !far) { far = 1; continue; }
+    int found = 0;
+    while (found < kk && bi[found] >= 0) {
+      if (ids)   ids[got]   = (int)k->ex_id[bi[found]];
+      if (dists) dists[got] = far && !(bd[found] < IRIS_KNN_FAR * IRIS_KNN_FAR)
+                            ? inf.f : iris_internal_sqrt(bd[found]);
+      last_d = bd[found]; last_r = bi[found];
+      ++found; ++got;
+    }
+    if (found < kk) break;                   /* the ranking has run out */
+  }
+#ifndef IRIS_NO_GUARDS
+  /* Neither distance is a number for any take, the reading being finite
+     (the refusals above say when). Report it, as iris_classify_1nn does. */
+  if (got == 0) k->status = IRIS_NAN_TRAPPED;
+#endif
+  return got;
 }
 
 /* The end of the floating-point scope opened by defence 3 of the determinism

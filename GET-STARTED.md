@@ -86,9 +86,9 @@ first five.
 
 > **You do not install iris.** `iris.h`, the library itself, is copied into
 > every sketch folder that uses it, and Arduino picks up headers next to a
-> sketch automatically. Every copy is iris **0.2.0**, from
+> sketch automatically. Every copy is iris **0.3.0**, from
 > https://github.com/kylebsmith/iris, and every sketch that uses it checks at
-> compile time that its copy is iris 0.2: a different version stops the
+> compile time that its copy is iris 0.3: a different version stops the
 > build with a message saying which file to copy.
 >
 > The Adafruit libraries are drivers — they talk to a specific screen and a
@@ -310,7 +310,7 @@ for boards other than the ES3C28P that have more memory than an Uno.
 
 This tree is the hardware half. The library itself, its decision records and
 its measurements are at https://github.com/kylebsmith/iris (these copies are
-version 0.2.0):
+version 0.3.0):
 
 - `iris.h` — the library, and the place the mathematics is written down
 - `examples/` — programs that run on a laptop with no board at all
