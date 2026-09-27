@@ -152,7 +152,11 @@ static iris *k;
 
 void setup() {
   Serial.begin(115200);
-  delay(400);
+  /* On a board with native USB, this kit's among them, the serial port
+     exists only once the computer opens it, and anything printed before
+     that is lost. Wait for it, for twenty seconds at most. */
+  while (!Serial && millis() < 20000) delay(10);
+  delay(200);
   pinMode(SAVE_BTN, INPUT_PULLUP);
 
   /* ---- FILL THIS IN 5: YOUR SENSOR'S SETUP, if it needs any -------------

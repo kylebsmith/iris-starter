@@ -78,6 +78,11 @@ static int demos = 0;
 
 void setup() {
   Serial.begin(115200);
+  /* On a board with native USB, this kit's among them, the serial port
+     exists only once the computer opens it, and anything printed before
+     that is lost. Wait for it, for twenty seconds at most. */
+  while (!Serial && millis() < 20000) delay(10);
+  delay(200);
   Wire.begin();
   /* bno.begin() returns false when the sensor is not answering. Carry on
      regardless and, with the cable out, every reading is a clean 0.0, every

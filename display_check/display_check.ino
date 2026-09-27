@@ -57,7 +57,11 @@ static bool touch_read(int *x, int *y) {
 
 void setup() {
   Serial.begin(115200);
-  delay(400);
+  /* On a board with native USB, this kit's among them, the serial port
+     exists only once the computer opens it, and anything printed before
+     that is lost. Wait for it, for twenty seconds at most. */
+  while (!Serial && millis() < 20000) delay(10);
+  delay(200);
   Serial.println("\ndisplay_check");
 
   pinMode(LCD_BL, OUTPUT);

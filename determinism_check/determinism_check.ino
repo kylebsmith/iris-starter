@@ -101,7 +101,11 @@ static int check(const __FlashStringHelper *name, uint32_t got, uint32_t want) {
 
 void setup() {
   Serial.begin(115200);
-  delay(1500);
+  /* On a board with native USB, this kit's among them, the serial port
+     exists only once the computer opens it, and anything printed before
+     that is lost. Wait for it, for twenty seconds at most. */
+  while (!Serial && millis() < 20000) delay(10);
+  delay(200);
 
   iris *k = iris_init(arena, sizeof arena, NI, NH, NO, CAP, 1234);
   if (!k) { Serial.println("iris_init refused"); return; }
