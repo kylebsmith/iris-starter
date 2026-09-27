@@ -89,12 +89,50 @@ same kind as the I2C lead; and that each knob, turned end to end, reads close
 to 0 and close to 4095 in `analogRead` (GPIO 14 is on the chip's second
 analog-to-digital converter, GPIO 2 and 3 on the first).
 
-Do not use GPIO 4, 5 and 6 or `A0` (GPIO 1) for knobs on this board: they
-are its audio lines and amplifier enable (vendor specification, page 11) and
-reach no connector.
+Put anything you add on the expansion socket's GPIO 2, 3, 14 and 21, or on
+the I2C socket's bus. Every other pin is wired to one of the board's own
+parts (below), and reaches no connector.
+
+## The board's own pins
+
+The pins the ES3C28P wires to its own parts, from the pin table on the
+vendor's page (http://www.lcdwiki.com/2.8inch_ESP32-S3_Display). Added
+hardware must avoid all of them; `i2c_find` does not drive them.
+
+| GPIO | Part | What the pin does |
+|---|---|---|
+| 1 | audio amplifier | enable: low switches the amplifier on, high off |
+| 4 | audio codec (ES8311), I2S | master clock |
+| 5 | audio codec, I2S | bit clock |
+| 6 | audio codec, I2S | data into the chip |
+| 7 | audio codec, I2S | left or right channel select |
+| 8 | audio codec, I2S | data out of the chip |
+| 9 | battery | voltage, read as an analog input |
+| 10 | display (ILI9341), SPI | chip select, low active |
+| 11 | display, SPI | data to the display |
+| 12 | display, SPI | clock |
+| 13 | display, SPI | data from the display |
+| 45 | display | backlight, high on |
+| 46 | display | command or data select |
+| 15 | I2C bus, the I2C socket | clock (SCL); shared with the touch controller and the codec's control |
+| 16 | I2C bus, the I2C socket | data (SDA); shared the same way |
+| 17 | touch controller (FT6336G) | interrupt, low when touched |
+| 18 | touch controller | reset, low active |
+| 38 | microSD card, SDIO | clock |
+| 40 | microSD card, SDIO | command |
+| 39, 41, 48, 47 | microSD card, SDIO | data lines 0 to 3 |
+| 42 | RGB LED | one data line for all three colours |
+| 0 | BOOT button | held at power-on, starts the chip's loader |
+| 43, 44 | UART0, the serial socket | receive (43), transmit (44) |
+| 2, 3, 14, 21 | expansion socket | nothing on the board: free |
+
+The display's reset is the chip's reset line (EN, the RESET button), not a
+GPIO. GPIO 19 and 20 are the chip's own USB port, the USB-C socket
+(Espressif's ESP32-S3 datasheet), and are on no table above.
 
 ## Where the board facts come from
 
 The vendor specification is "ES3C28P&ES3N28P Specification V1.0" by LCDWIKI,
 linked from http://www.lcdwiki.com/2.8inch_ESP32-S3_Display. Page numbers
-above are that document's.
+above are that document's. The table of the board's own pins is the pin table
+on that page.
