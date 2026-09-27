@@ -30,7 +30,14 @@
                                     the trained network -- to flash.
 
    On the next power-up the sketch loads it and plays exactly what you were
-   playing when you held SAVE. An instrument saved untrained with two or more
+   playing when you held SAVE.
+
+   Send x over the serial port and it prints the instrument as a saved file,
+   in hexadecimal between a line "IRIS <bytes>" and a line "END". Capture
+   the serial output (Serial Monitor's text, copied into a file, will do),
+   and the iris library's tools/iris_dump.c turns it back into the file and
+   writes the demonstrations, and what the instrument plays over a grid of
+   poses, as tables: how what a performer taught leaves the board. An instrument saved untrained with two or more
    demonstrations (its training had failed) retrains from them as soon as it
    has loaded them; one saved with a single demonstration trains at the next
    tap, which records the second.
@@ -245,6 +252,26 @@ static void keep_instrument(void) {
   else                         Serial.println(F("not trained -- tap SAVE at a second pose to train it."));
 }
 
+/* An x: print the instrument as the saved file, for tools/iris_dump.c (see
+   the top of this file). A run still in progress is finished first, as for a
+   hold, so the file holds the trained network. */
+static void print_instrument(void) {
+  if (training) {
+    Serial.println(F("finishing training before printing..."));
+    while (iris_train_slice(k, 256)) { }
+    finish_report();
+  }
+  size_t n = iris_save(k, saved, sizeof saved);
+  if (!n) { Serial.println(F("print refused -- iris_save returned 0.")); return; }
+  Serial.print(F("IRIS ")); Serial.println((unsigned long)n);
+  for (size_t i = 0; i < n; ++i) {
+    if (saved[i] < 16) Serial.print('0');
+    Serial.print(saved[i], HEX);
+    if (i % 32 == 31 || i + 1 == n) Serial.println();
+  }
+  Serial.println(F("END"));
+}
+
 #define HOLD_MS 1000
 
 void loop() {
@@ -267,6 +294,8 @@ void loop() {
     }
     delay(50);                                          /* debounce the release */
   }
+
+  if (Serial.available() && Serial.read() == 'x') print_instrument();
 
   keep_training();   /* a slice per pass, free when idle */
 
