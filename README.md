@@ -129,7 +129,10 @@ less consistent than anything it was tuned against.
 software question. You answer it by playing.
 
 What the sketches did on an ES3C28P, including the release header's hashes on
-the board: [board-logs/2026-09-25-es3c28p.md](board-logs/2026-09-25-es3c28p.md).
+the board: [board-logs/2026-09-25-es3c28p.md](board-logs/2026-09-25-es3c28p.md)
+for iris 0.2.0, and
+[board-logs/2026-09-28-es3c28p.md](board-logs/2026-09-28-es3c28p.md) for
+0.3.0 and the sketches that go with it.
 
 ## Two libraries, two different risks
 
