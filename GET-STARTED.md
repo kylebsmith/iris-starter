@@ -152,10 +152,15 @@ you power up.
 that appeared in **Tools → Port**, press **Upload** (the arrow), then open
 **Tools → Serial Monitor** at **115200** baud (the serial speed).
 
-It lists every device answering on every likely pin pair. On SDA 16 / SCL 15
-you should see **0x28** (or 0x29), the BNO055, next to **0x18** and **0x38**,
-the board's own audio codec and touch controller. If only those two answer,
-the sensor is not connected: it says so. Fix that before going on.
+The sketch waits up to 20 seconds for Serial Monitor to open before it prints
+anything, so open it straight after the upload. It lists every device
+answering on the board's I2C socket, SDA 16 / SCL 15. You should see **0x28**
+(or 0x29), the BNO055, next to **0x18** and **0x38**, the board's own audio
+codec and touch controller. If only those two answer, the sensor is not
+connected: it says so. Fix that before going on. On this board it then tries
+only the expansion socket's four free pins, and leaves the pins wired to the
+board's own parts alone (PARTS.md lists them); on another board it tries every
+likely pin pair. A Bosch pressure sensor at 0x76 or 0x77 is named by its chip.
 
 ## 7. The first sketch: `iris_tilt`
 
@@ -241,7 +246,17 @@ things:
   yours).
 
 On the next power-up it prints `loaded the instrument from last time.` and
-plays exactly what you were playing when you held SAVE. An instrument saved
+plays exactly what you were playing when you held SAVE.
+
+- **Send `x`** in Serial Monitor: it prints the instrument as a block of
+  hexadecimal between a line `IRIS <bytes>` and a line `END`. Copy the Serial
+  Monitor's text into a file, and the iris library's `tools/iris_dump.c`
+  turns it into tables of your demonstrations and of what the instrument
+  plays across your poses.
+- **`USE_HEADING 1`**, near the top of the sketch, makes it hear which way the
+  board faces as well as its tilt: six numbers from `heading.h` beside the
+  sketch, which never jump from 359 degrees to 0. Send `f` to make the way the
+  board points now its front. An instrument saved
 untrained with two or more demonstrations (its training had failed) retrains
 from them straight after loading. One saved with a single demonstration
 plays nothing until the next tap records a second.

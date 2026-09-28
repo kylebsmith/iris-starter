@@ -162,8 +162,9 @@ a number on a screen. What's obviously missing is missing on purpose.
   `IRIS_ARENA(...)` and `iris_init(...)` — they must agree or the arena is too
   small and `iris_init` refuses — and turning `target` and `out` from single
   floats into arrays. Change only one of those and it will not work.
-- **More inputs.** The BNO055 gives you heading and raw acceleration too, and
-  there are free pins for another sensor entirely.
+- **More inputs.** The BNO055 gives you heading and raw acceleration too
+  (heading as UP and FRONT, which never wrap: `boilerplate/stemma_bno055/heading.h`),
+  and there are free pins for another sensor entirely.
 - **A different sensor.** Distance, light, flex, pressure — anything that gives
   you a number.
 - **The screen.** Showing the learned space rather than a number changes how it
