@@ -112,6 +112,18 @@ void loop() {
     delay(300);                                    /* crude, but it debounces */
   }
 
+  /* Say who is playing, once, whenever it changes. Without this line the
+     numbers below are ambiguous: you cannot tell your own hand from the
+     network, and the first thing anyone asks is "why does tilting do
+     nothing?" -- the answer being that nothing has been demonstrated yet. */
+  { static int iris_has_it = -1;
+    const int now = iris_count(k) >= 2 ? 1 : 0;
+    if (now != iris_has_it) {
+      if (now) Serial.println(F("--- iris has the controls: the SENSOR is playing it now ---"));
+      else     Serial.println(F("--- you have the controls: nothing demonstrated yet, so you are hearing read_target ---"));
+      iris_has_it = now;
+    } }
+
   if (iris_count(k) >= 2) iris_predict(k, in, out);                /* [6] */
   send_sound(out);                 /* below two, you hear read_target itself */
   delay(20);
