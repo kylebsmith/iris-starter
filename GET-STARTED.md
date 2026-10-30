@@ -13,7 +13,7 @@ Steps 1 to 5 install and set up.
 
 **Then build your instrument.** Pose your sensor, set the sound, press SAVE.
 Do that twice and iris puts its hands on your controls. Two files start you:
-`boilerplate/add_iris` if you already have a project that reads something and
+`add_iris` if you already have a project that reads something and
 makes a sound, `boilerplate/any_sensor` if you are starting from nothing.
 Neither needs a sensor or any wiring to start making sound.
 [Where you build your instrument](#where-you-build-your-instrument-boilerplateany_sensor),
@@ -160,7 +160,7 @@ you power up.
 Two files, and which one depends on where you are starting.
 
 **If you already have a project** — a sketch that reads something and makes a
-sound — open `boilerplate/add_iris/add_iris.ino` instead of reading any
+sound — open `add_iris/add_iris.ino` instead of reading any
 further here. The whole library is six lines, they are numbered `[1]` to `[6]`
 in that file, and everything else in it is the smallest scaffolding that makes
 it a sketch. Lift the six lines into the `setup` and `loop` you already have.

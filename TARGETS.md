@@ -11,7 +11,7 @@ static void read_target(float *out);   /* fill out[0..N_OUTPUTS-1], each 0 to 1 
 iris never sees your interface. It takes `N_OUTPUTS` numbers between 0 and 1 and
 does not care where they came from.
 
-`boilerplate/any_sensor` and `boilerplate/add_iris` ship the one that needs no
+`boilerplate/any_sensor` and `add_iris` ship the one that needs no
 hardware: values held in memory, nudged from the Serial Monitor. This page has
 four more. Each is a drop-in replacement for that function and nothing else in
 the sketch changes — every pin number, scale factor and compile-time check a
@@ -210,7 +210,7 @@ static void read_target(float *out) {
 ## The one that ships, for reference
 
 This is what is already in `boilerplate/any_sensor` and
-`boilerplate/add_iris`, so you do not need to copy it — it is here so the five
+`add_iris`, so you do not need to copy it — it is here so the five
 can be read side by side.
 
 ```c

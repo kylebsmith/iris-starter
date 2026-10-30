@@ -69,7 +69,7 @@ incompatible ones share that pitch.
 ## Connecting the knobs
 
 Only `bno055_portable`, `stemma_bno055` and `iris_scope` with `USE_ANALOG 1`
-read knobs. `boilerplate/any_sensor` and `boilerplate/add_iris` set the sound
+read knobs. `boilerplate/any_sensor` and `add_iris` set the sound
 from the Serial Monitor instead, so they need none of this; paste the
 potentiometer version from [TARGETS.md](TARGETS.md) over their `read_target`
 and the wiring below applies to them too. On the ES3C28P the knobs go on the
