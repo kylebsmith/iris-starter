@@ -11,17 +11,40 @@ an ESP32-S3 (Espressif's microcontroller) with a touch screen.
 
 ## Start here
 
-Start with [GET-STARTED.md](GET-STARTED.md), steps 1 to 6: install, set up
-and check the wiring. Then pick one:
+Pose your sensor, set the sound, press SAVE. Do that twice and iris puts its
+hands on your controls. Two files start you, depending on where you are:
+
+- **You already have a project** that reads something and makes a sound →
+  `boilerplate/add_iris`. The whole library is six lines; that file is those
+  six lines in a sketch, numbered `[1]` to `[6]`, with the smallest honest
+  scaffolding around them. Lift them into the `setup` and `loop` you have.
+- **You are starting from nothing** → `boilerplate/any_sensor`. The same
+  instrument with every guard, every start-up check and every explanation a
+  first instrument deserves, and it fits in slices so the sound never stops.
+  Fill in the five places marked FILL THIS IN.
+
+Both play from the first flash, with nothing demonstrated and **nothing wired
+to the board**: whatever sets the target is already a hand-controlled
+instrument, and iris takes the controls once you have shown it twice. Both set
+the sound from the Serial Monitor, because that needs no hardware;
+[TARGETS.md](TARGETS.md) has knobs, a touchscreen, key switches and MIDI, each
+a drop-in replacement for one function.
+
+Install first: [GET-STARTED.md](GET-STARTED.md), steps 1 to 4 — the Arduino
+IDE, the board package, the libraries and the board settings. You need no
+sensor and no wiring to start.
+
+The other sketches are the library demonstrated on this board's own sensor and
+screen. Run them to see what iris does; build in one of the two above.
 
 - **Watch a network learn** (the class demo): `iris_scope` and its Processing
   plot, [iris_scope/README.md](iris_scope/README.md).
 - **Play by tilting:** `iris_tilt`, [GET-STARTED.md](GET-STARTED.md) step 7.
-- **Plug in your own sensor:** `boilerplate/any_sensor`; fill in the places
-  marked FILL THIS IN.
 - **A USB MIDI controller for a synthesiser:** `iris_instrument`,
   [SOUND.md](SOUND.md) (USB: Universal Serial Bus; MIDI: Musical Instrument
   Digital Interface, the message format synthesisers understand).
+- **An instrument that survives a power cycle:** `boilerplate/stemma_bno055`,
+  [GET-STARTED.md](GET-STARTED.md) step 10.
 
 Parts are in [PARTS.md](PARTS.md); getting sound out of any sketch is in
 [SOUND.md](SOUND.md); when something goes wrong, see
@@ -31,9 +54,17 @@ Parts are in [PARTS.md](PARTS.md); getting sound out of any sketch is in
 
 I2C (inter-integrated circuit) is the two-wire bus the sensor talks on.
 
-In the order GET-STARTED.md runs them, numbered by its steps:
+The two places to build in, then the demonstrations in the order
+GET-STARTED.md runs them, numbered by its steps:
 
 ```
+boilerplate/add_iris/    START HERE if you have a project already: the six
+                         lines of iris, numbered, and little else
+boilerplate/any_sensor/  START HERE if you are starting from nothing: the same
+                         instrument with every guard and every explanation.
+                         Any sensor, any board; it plays before you train it
+TARGETS.md               how to set the sound: knobs, a touchscreen, key
+                         switches, MIDI. One function each
 i2c_find/                6.  is the sensor wired right? lists every I2C address
 iris_tilt/               7.  the first instrument: 3 poses, one number; learn it
 iris_scope/              8.  see the curve the network invents
@@ -41,7 +72,6 @@ iris_scope/              8.  see the curve the network invents
 iris_instrument/         9.  screen, touch and USB MIDI sound
 boilerplate/
   stemma_bno055/         10. sensor and knobs, and it survives a power cycle
-  any_sensor/            any sensor, any board: start here on another board
   bno055_portable/       a real motion sensor on boards other than the ES3C28P
 display_check/           check: does the screen draw and the touch report?
 determinism_check/       check: the same instrument as a laptop, bit for bit?
