@@ -9,8 +9,18 @@ so: these instructions are only as good as the last person who followed them.
 When something goes wrong, [TROUBLESHOOTING.md](TROUBLESHOOTING.md) lists each
 symptom, its likely cause and what to do.
 
-Steps 1 to 5 install and set up. After that, the order of this page is the
-order to run the sketches in:
+Steps 1 to 5 install and set up.
+
+**Then build your instrument.** Pose your sensor, set the sound, press SAVE.
+Do that twice and iris puts its hands on your controls. Two files start you:
+`add_iris` if you already have a project that reads something and
+makes a sound, `boilerplate/any_sensor` if you are starting from nothing.
+Neither needs a sensor or any wiring to start making sound.
+[Where you build your instrument](#where-you-build-your-instrument-boilerplateany_sensor),
+after step 5, is both of them.
+
+The numbered walk after it is the library demonstrated on this board's own
+sensor and screen. Run as much of it as you like, to see what iris does:
 
 - step 6, `i2c_find` — is the sensor wired right?
 - step 7, `iris_tilt` — the first instrument: tilt, teach three poses, play
@@ -21,7 +31,6 @@ order to run the sketches in:
 - step 10, `boilerplate/stemma_bno055` — an instrument that survives a power
   cycle
 
-`boilerplate/any_sensor` is the starting point on any other board.
 `display_check`, `determinism_check`, `device_torture` and `board_probe` are
 checks you run when you need them (the end of this page says when).
 
@@ -146,6 +155,62 @@ GPIO 15 (GPIO: general-purpose input/output, a numbered pin of the chip).
 Check which of the lead's wires is which against the board's silkscreen before
 you power up.
 
+## Where you build your instrument: `boilerplate/any_sensor`
+
+Two files, and which one depends on where you are starting.
+
+**If you already have a project** — a sketch that reads something and makes a
+sound — open `add_iris/add_iris.ino` instead of reading any
+further here. The whole library is six lines, they are numbered `[1]` to `[6]`
+in that file, and everything else in it is the smallest scaffolding that makes
+it a sketch. Lift the six lines into the `setup` and `loop` you already have.
+It is about a hundred lines against `any_sensor`'s four hundred, because it
+leaves out every guard and explanation below.
+
+**If you are starting from nothing**, read on: `any_sensor` is the same
+instrument with all of that put back.
+
+**File → Open**, open `boilerplate/any_sensor/any_sensor.ino`. Upload it and
+open Serial Monitor at 115200, as in step 6 below.
+
+**It makes sound immediately.** Nothing is demonstrated and nothing need be
+wired: whatever sets the target plays straight through, so the sketch is a
+hand-controlled instrument from the first flash. It says which of you has the
+controls, and says so again when that changes.
+
+Then: pose your sensor, set the sound, press SAVE. Do that twice and **iris
+puts its hands on your controls** — the sensor now plays what you showed it, and
+sweeps between your demonstrations and beyond. Training is still something you
+ask for by pressing SAVE; what changed is that you are not waiting in silence
+until you have understood it.
+
+Five marked places to fill in, and it compiles and runs before you change any
+of them: the stand-in sensor is two slow waves the sketch makes itself.
+
+**FILL THIS IN 3 is the one that matters** — where the target comes from, which
+is to say how you tell it what sound you mean. `iris_record(k, in, out)` wants
+`out`: the sound you mean, as numbers. You have a sound you like and no idea
+what number it is, and closing that gap is this one function.
+
+What ships needs **no hardware at all**: one number per output, held in
+memory, moved from the Serial Monitor with `1` `2` `3` to pick an output and
+`+` and `-` to move it. That is a whole target interface — set a sound, press
+SAVE, set another, press SAVE — and it is why the sketch plays on a bare
+board.
+
+[TARGETS.md](TARGETS.md) has four more, each a drop-in replacement for that
+one function and nothing else: potentiometers, sliders on a touchscreen with
+LVGL (the Light and Versatile Graphics Library), mechanical key switches two
+per output, and an incoming MIDI control change. They live there rather than
+in the sketch so that opening `any_sensor` does not mean reading a hundred and
+sixty lines of code you will never run.
+
+`d` deletes the last demonstration and retrains, `c` clears everything.
+
+It builds for an Arduino Uno, a Nano Every, both Raspberry Pi Pico cores and
+the ESP32-S3, and on an Uno it fits only because the file shrinks the
+library's working arrays on that chip (the `IRIS_MAX_IN` block at its top).
+
 ## 6. Check the wiring: `i2c_find`
 
 **File → Open**, open `i2c_find/i2c_find.ino`. Plug the board in, pick the port
@@ -252,7 +317,10 @@ plays exactly what you were playing when you held SAVE.
   hexadecimal between a line `IRIS <bytes>` and a line `END`. Copy the Serial
   Monitor's text into a file, and the iris library's `tools/iris_dump.c`
   turns it into tables of your demonstrations and of what the instrument
-  plays across your poses.
+  plays across your poses — and, with `--c-array`, into the instrument itself
+  as a line of C you paste into a sketch. See
+  [Freezing an instrument into a sketch](#freezing-an-instrument-into-a-sketch)
+  below.
 - **`USE_HEADING 1`**, near the top of the sketch, makes it hear which way the
   board faces as well as its tilt: six numbers from `heading.h` beside the
   sketch, which never jump from 359 degrees to 0. Send `f` to make the way the
@@ -278,6 +346,41 @@ The other instruments deliberately do not save, so that the first thing you
 flash is as short as it can be. Copy the two calls out of `stemma_bno055`
 when you want an instrument to outlive the cable.
 
+## Freezing an instrument into a sketch
+
+An instrument you are happy with does not have to be taught again on the
+instrument you hand in. Teach it once on a rig with a SAVE button and knobs,
+then bake it:
+
+1. Get the instrument off the board: send `x` in Serial Monitor, as step 10
+   describes, and save the Serial Monitor's text as `capture.txt`.
+2. From a clone of the iris library (https://github.com/kylebsmith/iris):
+
+   ```
+   cc -std=c99 -O2 -Wall -Wextra -I. -o build/iris_dump tools/iris_dump.c
+   ./build/iris_dump capture.txt myinstrument --c-array
+   ```
+
+3. That writes `myinstrument-model.h`, which holds your instrument as
+   `static const unsigned char model[] = { ... }` and, in a comment above it,
+   the two lines that load it, with your instrument's own shape filled in.
+4. Put that file in your sketch's folder, `#include` it, and call `iris_load`
+   once in `setup`. The file says exactly how, and says what to print if the
+   load is refused — never play an instrument that did not load.
+
+The sketch that results has **no SAVE button, no knobs and no screen**. It
+reads your sensor and plays the mapping, which is what a finished instrument
+usually wants to be.
+
+**It is not a one-way door.** Your demonstrations travel inside the saved
+file, so a baked instrument is still the whole instrument: `iris_count` still
+counts them, `iris_get` still reads any of them back, and `iris_record` and
+`iris_train` still work. Give `IRIS_ARENA` and `iris_init` a demonstration
+count larger than the number you baked and you can add one to the finished
+instrument and refit it on the spot. Training in the loop is the point of this
+library; baking just means it does not have to be the price of your first
+instrument.
+
 ## Fixing a bad demonstration
 
 If you record a pose you did not mean, you do not start over.
@@ -288,16 +391,14 @@ clears with `c`, and `iris_instrument` with its CLR button.
 That loop — demonstrate, listen, delete the bad one, demonstrate again — is the
 point of teaching by showing rather than by typing numbers.
 
-## Don't have the board? Start here instead
+## Another board, or no board of ours at all
 
-Everything above assumes the ES3C28P and a BNO055. If you have something else —
-an Uno, a Pico, a Teensy, a bare ESP32 — open `boilerplate/any_sensor/` instead.
-It is the same instrument with the hardware taken out: five marked places to
-fill in, and it compiles and runs before you change anything, using two slow
-waves it makes itself as a stand-in sensor so you can press the button and
-watch it learn while your real parts are still in the post.
+The numbered walk assumes the ES3C28P and a BNO055.
+[`boilerplate/any_sensor`](#where-you-build-your-instrument-boilerplateany_sensor)
+assumes neither, which is one of the reasons it is the place to start: it is
+the same instrument with the hardware taken out, and it runs on an Uno, a
+Pico, a Teensy or a bare ESP32 exactly as it runs here.
 
-It builds for an Arduino Uno, both Raspberry Pi Pico cores and the ESP32-S3.
 On an Uno it uses 81% of the 2 kilobytes of memory and fits only because the
 file shrinks the library's working arrays on that chip (the `IRIS_MAX_IN`
 block at its top). It is the only sketch here that builds for an Uno: the

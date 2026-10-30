@@ -1,8 +1,15 @@
 /* BOILERPLATE FOR ANY SENSOR
    ==========================
-   Pose your sensor. Turn the knobs until it sounds right. Press SAVE.
-   Do that twice and it starts playing: now moving the sensor sweeps between
-   everything you showed it, and beyond.
+   It plays from the moment you flash it, with nothing wired to the board.
+   Whatever sets the target is already a hand-controlled instrument, and you
+   can hear it before you have understood a word about demonstration.
+   Pose your sensor. Set the sound until you like it. Press SAVE.
+   Do that twice and iris puts its hands on your controls: moving the sensor
+   now sweeps between everything you showed it, and beyond.
+
+   The sound is set from the Serial Monitor here, because that needs no
+   hardware at all. TARGETS.md has knobs, a touchscreen, key switches and
+   MIDI, each a drop-in replacement for one function.
 
    Fill in the five places marked FILL THIS IN. Everything else is done.
 
@@ -38,7 +45,7 @@
    one. The compiler's report for this file, unchanged (esp32 board package
    3.3.3 with the settings in GET-STARTED.md; Arduino AVR Boards 1.8.7 for the
    Uno): on an ESP32-S3 it uses 13% of memory and leaves 281,952 bytes free;
-   on an Uno it uses 81% and leaves 371.
+   on an Uno it uses 81% and leaves 369.
    So if you have the newer board, raising N_INPUTS for a sensor with more axes
    -- or N_DEMOS because you want to teach it a longer piece -- costs you
    nothing you will notice. Raise the three ceilings above with it if you go
@@ -65,38 +72,19 @@
    N_OUTPUTS is how many things you want to control.
    N_DEMOS   is how many demonstrations it can hold before it is full.
 
-   If you change N_OUTPUTS, the compiler stops you until POT_PIN below has
-   that many entries. Places 2 and 3 are checked when the sketch starts: if
-   read_sensor or read_target fills too few slots or too many, it halts with
-   a message saying which, rather than training on memory nobody wrote. */
+   Change these freely: everything else in the file sizes itself from them,
+   and no table of pin numbers has to be made to match. Everything a target
+   source needs -- its pins, its scale, its own compile-time check -- lives
+   inside the function that uses it, so raising N_OUTPUTS or swapping target
+   source is editing one function, not hunting through the file.
+   Places 2 and 3 are checked when the sketch starts: if read_sensor or
+   read_target fills too few slots or too many, it halts with a message
+   saying which, rather than training on memory nobody wrote. */
 #define N_INPUTS   2
 #define N_OUTPUTS  3
 #define N_DEMOS   16
 
 #define SAVE_BTN 0          /* the BOOT button on most boards */
-/* An ESP32's analogue inputs are 12-bit and read up to 4095. Almost everything
-   else in the Arduino world is 10-bit and reads up to 1023. Divide by the
-   wrong one and the knobs reach only part of their travel -- on an Uno,
-   dividing by 4095 gives read_target 0.0 to 0.25 where FILL THIS IN 4
-   promises 0.0 to 1.0 -- and nothing announces it, because iris fits its
-   output range to what you demonstrate and trains anyway. So the compiler
-   picks the number for the board. */
-#if defined(ARDUINO_ARCH_ESP32)
-#define ADC_MAX  4095.0f
-#else
-#define ADC_MAX  1023.0f
-#endif
-
-/* One knob per output. There must be exactly N_OUTPUTS of them.
-   On an ESP32 these are the ES3C28P's expansion-socket pins, the only ones on
-   that board that reach a connector and read a voltage (GPIO 2 and 3 on the
-   first analog-to-digital converter, GPIO 14 on the second; CHECK ON THE
-   BOARD, see boilerplate/stemma_bno055 and PARTS.md). Elsewhere, A0-A2. */
-#if defined(ARDUINO_ARCH_ESP32)
-static const int POT_PIN[] = { 2, 3, 14 };
-#else
-static const int POT_PIN[] = { A0, A1, A2 };
-#endif
 
 /* ---- FILL THIS IN 2: READ YOUR SENSOR -----------------------------------
    One line per input, and there must be exactly N_INPUTS of them.
@@ -113,16 +101,50 @@ static void read_sensor(float *in) {
 }
 
 /* ---- FILL THIS IN 3: WHERE DOES THE TARGET COME FROM? -------------------
-   When you press SAVE, this decides what sound you are demonstrating. Knobs
-   here, because they need no screen -- but iris never sees your interface. It
-   takes N_OUTPUTS numbers between 0 and 1 and does not care where they came
-   from: a rotary encoder, faders, a touchscreen, an incoming MIDI message
-   (MIDI, Musical Instrument Digital Interface, is the message format
-   synthesisers understand), a line typed into the serial monitor. Replace
-   the body, keep the shape. */
+   When you press SAVE, this decides what sound you are demonstrating. And
+   until there are two demonstrations it IS the instrument: the sketch plays
+   it straight through, so this function is the thing in your hands.
+
+   This one needs no hardware. The target is one number per output, held in
+   memory, and you move them from the Serial Monitor:
+
+     1 2 3 ...   pick which output you are setting (1 is out[0])
+     + or =      nudge it up by five hundredths
+     -           nudge it down
+
+   iris never sees your interface, though. It takes N_OUTPUTS numbers between
+   0 and 1 and does not care where they came from: knobs, a touchscreen, key
+   switches, an incoming MIDI message. TARGETS.md has four more you can paste
+   straight over this function, and nothing else in this file changes --
+   every pin number, scale factor and compile-time check a target source
+   needs lives inside the function that uses it.
+
+   Two things to keep if you write your own. It is called once a pass, not
+   only at the SAVE press, because a source that HOLDS a value has to be
+   polled to notice. And it takes only the keys it owns, looking with
+   Serial.peek() before Serial.read(), so 'd' and 'c' still reach the handler
+   in loop() below. */
 static void read_target(float *out) {
-  for (int i = 0; i < N_OUTPUTS; ++i)
-    out[i] = analogRead(POT_PIN[i]) / ADC_MAX;   /* <<< YOUR INTERFACE HERE */
+  static float held[N_OUTPUTS];
+  static bool started = false;
+  static int sel = 0;
+  if (!started) {                 // the middle of the range, not zero
+    for (int i = 0; i < N_OUTPUTS; ++i) held[i] = 0.5f;
+    started = true;
+  }
+  while (Serial.available()) {
+    const int c = Serial.peek();
+    if (c >= '1' && c <= '9' && c - '1' < N_OUTPUTS) sel = c - '1';
+    else if (c == '+' || c == '=')                   held[sel] += 0.05f;
+    else if (c == '-')                               held[sel] -= 0.05f;
+    else break;                   // not a key this function owns: leave it
+    Serial.read();                // ours: take it off the queue
+    if (held[sel] > 1.0f) held[sel] = 1.0f;
+    if (held[sel] < 0.0f) held[sel] = 0.0f;
+    Serial.print(F("target ")); Serial.print(sel + 1);
+    Serial.print(F(" = "));      Serial.println(held[sel], 3);
+  }
+  for (int i = 0; i < N_OUTPUTS; ++i) out[i] = held[i];
 }
 
 /* ---- FILL THIS IN 4: SEND YOUR SOUND ------------------------------------
@@ -139,13 +161,6 @@ static void send_sound(const float *out) {
 /* =========================================================================
    Nothing below here needs changing.
    ========================================================================= */
-
-/* If POT_PIN does not have exactly N_OUTPUTS entries, this line fails to
-   compile with the name of the problem in the error. Without it, a missing
-   entry is read from past the end of the array, and that knob reads whatever
-   pin number happens to be there. */
-typedef char POT_PIN_must_have_exactly_N_OUTPUTS_entries
-             [(sizeof POT_PIN / sizeof POT_PIN[0]) == N_OUTPUTS ? 1 : -1];
 
 static unsigned char memory[IRIS_ARENA(N_INPUTS, 12, N_OUTPUTS, N_DEMOS)];
 static iris *k;
@@ -266,7 +281,12 @@ void setup() {
       Serial.println(F("without ever telling you it is missing."));
     } }
 
-  Serial.println(F("ready. pose the sensor, set the knobs, press SAVE."));
+  Serial.println(F("ready -- and already playing. the target source has the"));
+  Serial.println(F("controls, so it makes sound now, with nothing demonstrated."));
+  Serial.println(F("1 2 3 pick an output, + and - move it. that is the sound."));
+  Serial.println(F("pose the sensor, set the sound, press SAVE. do that twice"));
+  Serial.println(F("and iris takes over: the sensor plays what you showed it."));
+  Serial.println(F("knobs, a touchscreen, keys or MIDI instead: TARGETS.md."));
   Serial.println(F("send 'd' to delete the last demonstration, 'c' to clear."));
 }
 
@@ -317,9 +337,16 @@ static void keep_training(void) {
 void loop() {
   float in[N_INPUTS], out[N_OUTPUTS];
   read_sensor(in);
+  /* The target, once a pass, before anything else touches the serial port.
+     Once a pass, because a target source that holds a value and is nudged --
+     keys, a typed character, an incoming MIDI control change -- only notices
+     when it is polled, and because until there are two demonstrations this is
+     what the instrument plays. Before the 'd' and 'c' handler below, because
+     that handler reads a byte and discards whatever it does not recognise,
+     and some target sources own keys of their own. */
+  read_target(out);
 
   if (digitalRead(SAVE_BTN) == LOW) {
-    read_target(out);
     if (!iris_record(k, in, out)) {        /* 0 means it did not record */
       /* Three different things make it refuse, and telling a student the wrong
          one sends them to fix the wrong thing: "full" when the real cause was
@@ -365,6 +392,24 @@ void loop() {
 
   keep_training();                  /* a slice per pass; free when idle */
 
-  if (iris_count(k) >= 2) { iris_predict(k, in, out); send_sound(out); }
+  /* Who has the controls? Below two demonstrations the target source plays
+     straight through, so this is a working instrument from the first flash
+     and iris is an addition to it rather than the price of entry. At two,
+     iris puts its hands on your controls. Nothing about WHEN training happens
+     changes here -- only what you hear before it has.
+     Say which, once, whenever it changes: the handover is the whole idea, and
+     a student who never sees a line about it never learns it happened. */
+  { static int iris_has_it = -1;
+    const int now = iris_count(k) >= 2 ? 1 : 0;
+    if (now != iris_has_it) {
+      if (now) Serial.println(F("iris has the controls: the sensor now "
+                                "plays what you showed it."));
+      else     Serial.println(F("you have the controls: the target source "
+                                "plays straight through."));
+      iris_has_it = now;
+    } }
+
+  if (iris_count(k) >= 2) iris_predict(k, in, out);
+  send_sound(out);
   delay(20);
 }

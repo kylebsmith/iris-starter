@@ -68,8 +68,11 @@ incompatible ones share that pitch.
 
 ## Connecting the knobs
 
-Only `boilerplate/any_sensor`, `bno055_portable`, `stemma_bno055` and
-`iris_scope` with `USE_ANALOG 1` read knobs. On the ES3C28P they go on the
+Only `bno055_portable`, `stemma_bno055` and `iris_scope` with `USE_ANALOG 1`
+read knobs. `boilerplate/any_sensor` and `add_iris` set the sound
+from the Serial Monitor instead, so they need none of this; paste the
+potentiometer version from [TARGETS.md](TARGETS.md) over their `read_target`
+and the wiring below applies to them too. On the ES3C28P the knobs go on the
 **expansion socket**, a 1.25 mm 4-pin socket carrying GPIO 2, 3, 14 and 21
 (vendor specification, pages 9 and 12). Each knob's middle leg (the wiper)
 goes to one pin:

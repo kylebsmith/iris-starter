@@ -70,6 +70,73 @@ jobs:
           done
           exit $fail
 
+      - name: Every read_target in TARGETS.md compiles
+        run: |
+          set -u
+          # The target sources moved out of the sketches into TARGETS.md so that
+          # a student opening any_sensor is not reading 160 lines of code they
+          # will never run. Markdown is not compiled by anything above, so each
+          # block goes back into add_iris in place of its
+          # read_target and is compiled there. Without this step the four
+          # alternates rot silently, which is the one thing this kit may not do.
+          python3 - <<'PY'
+          import io, os, re, shutil
+          out = os.path.join(os.environ["RUNNER_TEMP"], "targets")
+          md = io.open("TARGETS.md", encoding="utf-8").read()
+          base = io.open("add_iris/add_iris.ino", encoding="utf-8").read()
+          i = base.index("static void read_target(float *out) {")
+          j = base.index("\n}\n", i) + 3
+          live = base[i:j]
+          blocks = [b for b in re.findall(r"```c\n(.*?)```", md, re.S)
+                    if "read_target(float *out) {" in b]
+          shutil.rmtree(out, ignore_errors=True)
+          for n, code in enumerate(blocks):
+              d = os.path.join(out, "t%d" % n)
+              os.makedirs(d)
+              io.open(os.path.join(d, "t%d.ino" % n), "w", encoding="utf-8").write(
+                  base.replace(live, code.rstrip() + "\n"))
+              shutil.copy("add_iris/iris.h", d)
+          print("TARGETS.md: %d read_target implementations to compile" % len(blocks))
+          open(os.path.join(out, "count"), "w").write(str(len(blocks)))
+          PY
+          n=$(cat "$RUNNER_TEMP/targets/count")
+          [ "$n" -ge 5 ] || { echo "::error::only $n read_target blocks found in TARGETS.md; expected at least 5"; exit 1; }
+          # LVGL needs a configuration header beside the library, and a clean
+          # runner has none, so the touchscreen block cannot compile without
+          # one. LVGL ships a template for exactly this: copy it into place
+          # with its content switched on. Never replace a configuration that
+          # is already there, so running this script on a machine with its own
+          # lv_conf.h leaves it alone -- that file existing locally is what
+          # hid this failure until CI found it.
+          arduino-cli lib install lvgl@8.4.0 > /dev/null
+          libs="$(arduino-cli config get directories.user)/libraries"
+          if [ -f "$libs/lv_conf.h" ]; then
+            echo "$libs/lv_conf.h exists already; left alone"
+          else
+            sed 's|^#if 0 |#if 1 |' "$libs/lvgl/lv_conf_template.h" > "$libs/lv_conf.h"
+            grep -q '^#if 1 ' "$libs/lv_conf.h" || { echo "::error::lv_conf_template.h is not the shape this expects"; exit 1; }
+            echo "wrote $libs/lv_conf.h from lvgl's own template"
+          fi
+          fail=0
+          for d in "$RUNNER_TEMP"/targets/t*/; do
+            d=${d%/}; lbl=$(basename "$d")
+            log="$RUNNER_TEMP/targets-$lbl.log"
+            if arduino-cli compile --fqbn "$FQBN_DOCUMENTED" --warnings all \
+                 --build-path "$RUNNER_TEMP/build/targets-$lbl" "$d" > "$log" 2>&1; then
+              status=ok
+            else
+              status=FAILED
+            fi
+            own=$(grep -E "^$d/[^:]+:[0-9]+(:[0-9]+)?: (warning|error)" "$log" || true)
+            printf '%-24s %s\n' "TARGETS.md $lbl" "$status"
+            if [ "$status" != ok ] || [ -n "$own" ]; then
+              echo "::group::TARGETS.md $lbl"; cat "$log"; echo "::endgroup::"
+              [ -n "$own" ] && printf '%s\n' "$own" | sed 's/^/::error::/'
+              fail=1
+            fi
+          done
+          exit $fail
+
       - name: iris_instrument refuses to build without TinyUSB
         run: |
           if arduino-cli compile --fqbn "$FQBN_HWCDC" --build-path "$RUNNER_TEMP/build/refuse" iris_instrument > "$RUNNER_TEMP/refuse.log" 2>&1; then
