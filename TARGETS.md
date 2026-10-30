@@ -207,6 +207,120 @@ static void read_target(float *out) {
 }
 ```
 
+## A line of numbers from Max (or any program on your computer)
+
+**Use this one if your sound lives on your computer, not on the board.**
+
+Your Max patch already has sliders for the sound. You do not need to build
+anything new — just send those numbers down the USB cable you are already
+using, and the board will record them.
+
+### What you send
+
+One line, starting with the letter `t`:
+
+```
+t 0.80 0.20 0.50
+```
+
+That is it. `t` for target, then one number per output, each between 0 and 1,
+ending with a newline **or a semicolon**. A semicolon means a plain Max message
+box works with no extra objects.
+
+### The Max side
+
+```
+3 sliders (set Range 0. to 1.)
+      |
+   [pak 0. 0. 0.]
+      |
+   [sprintf t %.3f %.3f %.3f]
+      |
+   [serial a 115200]            <- the same [serial] you already read from
+```
+
+Then send `;` after it, or use a message box reading `t $1 $2 $3;`.
+
+### The board side
+
+Paste this over `read_target` in `add_iris/add_iris.ino`. Nothing else changes.
+
+```c
+static void read_target(float *out) {
+  static float held[N_OUTPUTS];      // the sound Max last asked for
+  static char  line[64];             // one line, built up as it arrives
+  static int   len = 0, inside = 0, started = 0;
+  if (!started) {                    // mid-range until Max says otherwise
+    for (int i = 0; i < N_OUTPUTS; ++i) held[i] = 0.5f;
+    started = 1;
+  }
+  while (Serial.available()) {
+    if (!inside) {                   // waiting for a line that starts with t
+      if (Serial.peek() != 't') break;     // not ours: leave it for loop()
+      Serial.read(); inside = 1; len = 0; continue;
+    }
+    const int c = Serial.read();
+    if (c != '\n' && c != '\r' && c != ';') {   // still collecting
+      if (len < (int)sizeof line - 1) line[len++] = (char)c;
+      else { len = -1; }             // too long: remember, report at the end
+      continue;
+    }
+    inside = 0;                      // end of line: parse it
+    if (len < 0) { Serial.println(F("target line too long, ignored.")); continue; }
+    line[len] = 0;
+    float v[N_OUTPUTS];
+    int got = 0;
+    char *p = line, *end;
+    while (got < N_OUTPUTS) {
+      v[got] = (float)strtod(p, &end);
+      if (end == p) break;           // no number here: stop
+      p = end; ++got;
+    }
+    if (got != N_OUTPUTS) {          // never half-apply a target
+      Serial.print(F("target line had ")); Serial.print(got);
+      Serial.print(F(" numbers, need ")); Serial.print(N_OUTPUTS);
+      Serial.println(F(" -- ignored."));
+      continue;
+    }
+    for (int i = 0; i < N_OUTPUTS; ++i)
+      held[i] = v[i] > 1.0f ? 1.0f : v[i] < 0.0f ? 0.0f : v[i];
+    Serial.print(F("target from Max:"));
+    for (int i = 0; i < N_OUTPUTS; ++i) { Serial.print(' '); Serial.print(held[i], 3); }
+    Serial.println();
+  }
+  for (int i = 0; i < N_OUTPUTS; ++i) out[i] = held[i];
+}
+```
+
+### Recording without a button
+
+You cannot press a button on a spinning chain. To record from Max, send the
+letter `r`, and add **two lines** to `loop()` in `add_iris.ino` — find the
+`digitalRead(SAVE_BTN) == LOW` line and change it to:
+
+```c
+  const int from_max = Serial.available() && Serial.peek() == 'r' ? Serial.read() : 0;
+  if (digitalRead(SAVE_BTN) == LOW || from_max) {
+```
+
+Now `r` records a demonstration exactly as the button does. This is the one
+target source that needs a change outside `read_target`, and that is why: the
+trigger has to come from the computer too.
+
+### What it tells you when something is wrong
+
+It never half-applies a target, because a silently wrong target trains fine and
+plays nonsense. It prints:
+
+- `target from Max: 0.800 0.200 0.500` — it worked, and that is what it stored.
+- `target line had 2 numbers, need 3 -- ignored.` — your `sprintf` is sending
+  the wrong count.
+- `target line too long, ignored.` — the newline or semicolon never arrived.
+
+If you see nothing at all, the line is not starting with `t`, or Max has the
+port open and the Arduino Serial Monitor does not (only one program can hold
+it at a time).
+
 ## The one that ships, for reference
 
 This is what is already in `boilerplate/any_sensor` and
